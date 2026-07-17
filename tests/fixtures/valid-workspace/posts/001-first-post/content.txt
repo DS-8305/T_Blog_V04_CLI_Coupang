@@ -1,0 +1,5 @@
+[TITLE]First post title[/TITLE]
+
+Normal paragraph text.
+
+[IMAGE:images/hero.png]
