@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parseContent } from "./parser";
-import type { PostJob, ValidationError } from "../shared/types";
+import { readPostStatus } from "./statusStore";
+import type { PostJob, PostStatus, ValidationError } from "../shared/types";
+
+const terminalStatuses = new Set<PostStatus>(["draft_saved", "published", "scheduled"]);
 
 export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
   const postsRoot = await resolvePostsRoot(workspacePath);
@@ -12,6 +15,8 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
   for (const id of folderNames) {
     const folderPath = path.join(postsRoot, id);
     if (await hasSuccessMarker(folderPath)) continue;
+    const persistedStatus = await readPostStatus(folderPath);
+    if (persistedStatus && terminalStatuses.has(persistedStatus.status)) continue;
 
     const contentPath = await resolveContentPath(folderPath);
     const content = await readContent(contentPath);
@@ -50,7 +55,9 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
       folderPath,
       contentPath,
       parsed,
-      status: parsed.errors.length > 0 ? "validation_error" : "pending"
+      status: parsed.errors.length > 0
+        ? "validation_error"
+        : persistedStatus?.status === "needs_review" ? "needs_review" : "pending"
     });
   }
 

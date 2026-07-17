@@ -35,7 +35,18 @@ export type ParsedPost = {
   errors: ValidationError[];
 };
 
-export type PostStatus = "pending" | "validation_error" | "running" | "draft_saved" | "failed" | "stopped";
+export type PostStatus =
+  | "pending"
+  | "validation_error"
+  | "running"
+  | "draft_saved"
+  | "published"
+  | "scheduled"
+  | "needs_review"
+  | "failed"
+  | "stopped";
+
+export type ReviewOutcome = "already_created" | "not_created";
 
 export type PostJob = {
   id: string;

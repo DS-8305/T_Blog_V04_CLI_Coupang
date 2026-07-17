@@ -96,6 +96,24 @@ describe("loadPosts", () => {
     expect(posts.map((post) => post.id)).toEqual(["002-pending"]);
   });
 
+  it("excludes terminal statuses and preserves needs_review", async () => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "workspace-status-filter-"));
+    const statuses = ["draft_saved", "published", "scheduled", "needs_review", "pending"] as const;
+    for (const [index, status] of statuses.entries()) {
+      const postFolder = path.join(workspace, `${index + 1}-${status}`);
+      await fs.mkdir(postFolder, { recursive: true });
+      await fs.writeFile(path.join(postFolder, "content.txt"), "[TITLE]A[/TITLE]\nBody", "utf8");
+      await fs.writeFile(path.join(postFolder, "status.json"), JSON.stringify({ status, message: status }), "utf8");
+    }
+
+    const posts = await loadPosts(workspace);
+
+    expect(posts.map((post) => [post.id, post.status])).toEqual([
+      ["4-needs_review", "needs_review"],
+      ["5-pending", "pending"]
+    ]);
+  });
+
   it("marks posts with parser errors as validation_error", async () => {
     const workspace = path.resolve("tests/fixtures/invalid-workspace");
     const posts = await loadPosts(workspace);

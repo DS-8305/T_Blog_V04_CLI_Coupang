@@ -6,6 +6,9 @@ const statusLabels: Record<PostStatus, string> = {
   validation_error: "검증 오류",
   running: "작성 중",
   draft_saved: "임시저장 완료",
+  published: "공개 발행 완료",
+  scheduled: "예약 발행 완료",
+  needs_review: "결과 확인 필요",
   failed: "실패",
   stopped: "중지됨"
 };
