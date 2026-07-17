@@ -1,7 +1,7 @@
 # Tistory Blog Automation Design
 
 Date: 2026-07-17
-Status: Approved design, awaiting written-spec review
+Status: Approved
 
 ## 1. Goal
 
