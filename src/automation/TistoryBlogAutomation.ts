@@ -110,7 +110,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
     }
 
     const body = await this.firstEditorBody(page);
-    await body.click();
+    await body.press("Control+End");
     if (event.type === "typeText") {
       await page.keyboard.type(event.text, { delay: speed.keyDelayMs });
       await page.keyboard.press("Enter");
@@ -137,9 +137,8 @@ export class TistoryBlogAutomation implements AutomationEngine {
       const chooser = await chooserPromise;
       await chooser.setFiles(event.absolutePath);
       await body.locator("img").nth(imagesBefore).waitFor({ state: "visible", timeout: 30_000 });
-      await body.click();
-      await page.keyboard.press("End");
-      await page.keyboard.press("Enter");
+      await body.press("Control+End");
+      await body.press("Enter");
     }
   }
 

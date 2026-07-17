@@ -95,7 +95,7 @@ describe("TistoryBlogAutomation editor events", () => {
     await automation.executeEvent(page as never, { type: "typeText", text: "iframe 본문" }, speed);
 
     expect(actions).toEqual([
-      "click:iframe-body",
+      "press:iframe-body:Control+End",
       "type:iframe 본문",
       "press:Enter",
       "press:Enter"
@@ -110,7 +110,7 @@ describe("TistoryBlogAutomation editor events", () => {
     await automation.executeEvent(page as never, { type: "typeHeading1", text: "첫 소제목" }, speed);
 
     expect(actions).toEqual([
-      `click:${tistorySelectors.body[0]}`,
+      `press-on:${tistorySelectors.body[0]}:Control+End`,
       `click:${tistorySelectors.formatMenu[0]}`,
       `click:${tistorySelectors.heading1[0]}`,
       "type:첫 소제목",
@@ -150,6 +150,23 @@ describe("TistoryBlogAutomation editor events", () => {
     expect(actions).toContain("click:visible-attach");
     expect(actions).not.toContain("click:hidden-attach");
   });
+
+  it("moves the caret after an image before entering the following body text", async () => {
+    const actions: string[] = [];
+    const page = createEditorPage(actions);
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+
+    await automation.executeEvent(page as never, {
+      type: "insertImage",
+      relativePath: "images/hero.png",
+      absolutePath: "C:\\post\\images\\hero.png"
+    }, speed);
+    await automation.executeEvent(page as never, { type: "typeText", text: "이미지 아래 본문" }, speed);
+
+    expect(actions).toContain(`press-on:${tistorySelectors.body[0]}:Control+End`);
+    expect(actions).toContain(`press-on:${tistorySelectors.body[0]}:Enter`);
+    expect(actions).not.toContain(`click:${tistorySelectors.body[0]}`);
+  });
 });
 
 function createDuplicateAttachPage(actions: string[]) {
@@ -162,6 +179,7 @@ function createDuplicateAttachPage(actions: string[]) {
   const body = {
     isVisible: vi.fn(async () => true),
     click: vi.fn(async () => { actions.push("click:body"); }),
+    press: vi.fn(async (key: string) => { actions.push(`press-on:body:${key}`); }),
     locator: vi.fn(() => imageCollection)
   };
   const hiddenAttach = {
@@ -240,7 +258,8 @@ function createIframeEditorPage(actions: string[]) {
   const iframeBodyLocator = {
     first: () => iframeBodyLocator,
     isVisible: vi.fn(async () => true),
-    click: vi.fn(async () => { actions.push("click:iframe-body"); })
+    click: vi.fn(async () => { actions.push("click:iframe-body"); }),
+    press: vi.fn(async (key: string) => { actions.push(`press:iframe-body:${key}`); })
   };
   return {
     locator: vi.fn(() => missingTopLevelLocator),
@@ -270,6 +289,7 @@ function createEditorPage(actions: string[]) {
     isVisible: vi.fn(async () => visible.has(selector)),
     count: vi.fn(async () => visible.has(selector) ? 1 : 0),
     click: vi.fn(async () => { actions.push(`click:${selector}`); }),
+    press: vi.fn(async (key: string) => { actions.push(`press-on:${selector}:${key}`); }),
     fill: vi.fn(async (value: string) => { actions.push(`fill:${selector}:${value}`); }),
     setInputFiles: vi.fn(async (value: string) => { actions.push(`upload:${value}`); }),
     locator: vi.fn((child: string) => ({
