@@ -135,7 +135,65 @@ describe("TistoryBlogAutomation editor events", () => {
     expect(actions.filter((action) => action.startsWith("choose:"))).toHaveLength(1);
     expect(actions).toContain("wait:image:0");
   });
+
+  it("uses a visible TinyMCE attachment control when a hidden duplicate comes first", async () => {
+    const actions: string[] = [];
+    const page = createDuplicateAttachPage(actions);
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+
+    await automation.executeEvent(page as never, {
+      type: "insertImage",
+      relativePath: "images/hero.png",
+      absolutePath: "C:\\post\\images\\hero.png"
+    }, speed);
+
+    expect(actions).toContain("click:visible-attach");
+    expect(actions).not.toContain("click:hidden-attach");
+  });
 });
+
+function createDuplicateAttachPage(actions: string[]) {
+  const imageCollection = {
+    count: vi.fn(async () => 0),
+    nth: vi.fn((index: number) => ({
+      waitFor: vi.fn(async () => { actions.push(`wait:image:${index}`); })
+    }))
+  };
+  const body = {
+    isVisible: vi.fn(async () => true),
+    click: vi.fn(async () => { actions.push("click:body"); }),
+    locator: vi.fn(() => imageCollection)
+  };
+  const hiddenAttach = {
+    isVisible: vi.fn(async () => false),
+    click: vi.fn(async () => { actions.push("click:hidden-attach"); })
+  };
+  const visibleAttach = {
+    isVisible: vi.fn(async () => true),
+    click: vi.fn(async () => { actions.push("click:visible-attach"); })
+  };
+  const photo = {
+    isVisible: vi.fn(async () => true),
+    click: vi.fn(async () => { actions.push("click:photo"); })
+  };
+  const collection = (items: Array<Record<string, unknown>>) => ({
+    count: vi.fn(async () => items.length),
+    first: vi.fn(() => items[0]),
+    nth: vi.fn((index: number) => items[index])
+  });
+  return {
+    frameLocator: vi.fn(() => ({ locator: vi.fn(() => collection([body])) })),
+    locator: vi.fn((selector: string) => {
+      if (selector === tistorySelectors.attach[0]) return collection([hiddenAttach, visibleAttach]);
+      if (selector === tistorySelectors.photoMenuItem[0]) return collection([photo]);
+      return collection([]);
+    }),
+    waitForEvent: vi.fn(async () => ({
+      setFiles: vi.fn(async (value: string) => { actions.push(`choose:${value}`); })
+    })),
+    keyboard: { press: vi.fn(), type: vi.fn() }
+  };
+}
 
 describe("TistoryBlogAutomation finalization", () => {
   it("confirms a draft when Tistory increments the saved-draft count", async () => {
@@ -159,6 +217,8 @@ function createDraftFinalizationPage() {
   let draftCount = 0;
   const locatorFor = (selector: string) => ({
     first: () => locatorFor(selector),
+    nth: () => locatorFor(selector),
+    count: vi.fn(async () => selector === tistorySelectors.draftButton[0] ? 1 : 0),
     isVisible: vi.fn(async () => selector === tistorySelectors.draftButton[0]),
     click: vi.fn(async () => { if (selector === tistorySelectors.draftButton[0]) draftCount += 1; }),
     getAttribute: vi.fn(async () => null),
@@ -206,8 +266,9 @@ function createEditorPage(actions: string[]) {
   ]);
   const makeLocator = (selector: string) => ({
     first: () => makeLocator(selector),
+    nth: () => makeLocator(selector),
     isVisible: vi.fn(async () => visible.has(selector)),
-    count: vi.fn(async () => 0),
+    count: vi.fn(async () => visible.has(selector) ? 1 : 0),
     click: vi.fn(async () => { actions.push(`click:${selector}`); }),
     fill: vi.fn(async (value: string) => { actions.push(`fill:${selector}:${value}`); }),
     setInputFiles: vi.fn(async (value: string) => { actions.push(`upload:${value}`); }),

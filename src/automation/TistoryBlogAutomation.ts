@@ -223,8 +223,12 @@ export class TistoryBlogAutomation implements AutomationEngine {
 
   private async firstVisible(page: Page, selectors: readonly string[], timeout = 3_000) {
     for (const selector of selectors) {
-      const locator = page.locator(selector).first();
-      if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+      const matches = page.locator(selector);
+      const count = await matches.count().catch(() => 0);
+      for (let index = 0; index < count; index += 1) {
+        const locator = matches.nth(index);
+        if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+      }
     }
     throw new Error(`Tistory control not found: ${selectors.join(" | ")}`);
   }
