@@ -1,6 +1,7 @@
 export const TISTORY_HOME_URL = "https://www.tistory.com/";
 
 export const tistorySelectors = {
+  editorIframe: ["#editor-tistory_ifr", "iframe[title*='서식 있는 텍스트 편집기']"],
   editorReady: [
     "textarea#post-title-inp",
     "textarea[placeholder*='제목']",
@@ -21,13 +22,15 @@ export const tistorySelectors = {
   ],
   title: ["textarea#post-title-inp", "textarea[placeholder*='제목']"],
   body: [".mce-content-body[contenteditable='true']", "div[contenteditable='true'][role='textbox']"],
-  formatMenu: ["button[aria-label*='서식']", "button[title*='서식']", ".mce-btn[aria-label*='Formats']"],
+  formatMenu: ["[aria-label='문단모양']", ".mce-menubtn[aria-haspopup='true']"],
   heading1: ["[role='menuitem']:has-text('제목1')", "button:has-text('제목1')", "span:has-text('제목1')"],
-  divider: ["button[aria-label*='구분선']", "button[title*='구분선']", "button:has-text('구분선')"],
-  imageInput: ["input[type='file'][accept*='image']", "input[type='file']"],
+  divider: ["[aria-label='구분선']"],
+  attach: ["[aria-label='첨부']"],
+  photoMenuItem: ["[role='menuitem']:has-text('사진')"],
   categoryButton: ["button:has-text('카테고리')", "button[aria-label*='카테고리']"],
   tagInput: ["input[placeholder*='태그']", "input[aria-label*='태그']"],
   draftButton: ["button:has-text('임시저장')", "button:has-text('저장')"],
+  draftCount: ["button.count[aria-label^='임시저장 개수']"],
   completeButton: ["button:has-text('완료')", "button:has-text('발행')"],
   publicOption: ["label:has-text('공개')", "button:has-text('공개')"],
   scheduleOption: ["label:has-text('예약')", "button:has-text('예약')"],

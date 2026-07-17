@@ -84,7 +84,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
     try {
       const page = await this.getPage();
       await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
-      await this.firstVisible(page, tistorySelectors.body, 10_000);
+      await this.firstEditorBody(page, 10_000);
       const speed = getTypingSpeedProfile(options.speed);
       for (const event of job.parsed.events) {
         if (options.signal?.aborted) throw new Error("Run stopped by user");
@@ -109,7 +109,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
       return;
     }
 
-    const body = await this.firstVisible(page, tistorySelectors.body);
+    const body = await this.firstEditorBody(page);
     await body.click();
     if (event.type === "typeText") {
       await page.keyboard.type(event.text, { delay: speed.keyDelayMs });
@@ -131,7 +131,11 @@ export class TistoryBlogAutomation implements AutomationEngine {
       await page.keyboard.press("Enter");
     } else if (event.type === "insertImage") {
       const imagesBefore = await body.locator("img").count();
-      await (await this.firstAttached(page, tistorySelectors.imageInput)).setInputFiles(event.absolutePath);
+      await (await this.firstVisible(page, tistorySelectors.attach)).click();
+      const chooserPromise = page.waitForEvent("filechooser");
+      await (await this.firstVisible(page, tistorySelectors.photoMenuItem)).click();
+      const chooser = await chooserPromise;
+      await chooser.setFiles(event.absolutePath);
       await body.locator("img").nth(imagesBefore).waitFor({ state: "visible", timeout: 30_000 });
       await body.click();
       await page.keyboard.press("End");
@@ -158,6 +162,8 @@ export class TistoryBlogAutomation implements AutomationEngine {
     const { publication, scheduledAt } = job.parsed.metadata;
     const status = publication === "draft" ? "draft_saved" : publication === "public" ? "published" : "scheduled";
     const finalSelector = publication === "draft" ? tistorySelectors.draftButton : tistorySelectors.completeButton;
+    const draftCountBefore = publication === "draft" ? await this.readDraftCount(page) : null;
+    const urlBefore = page.url();
 
     if (publication !== "draft") {
       await (await this.firstVisible(page, tistorySelectors.completeButton)).click();
@@ -173,10 +179,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
     const button = await this.firstVisible(page, publication === "draft" ? finalSelector : tistorySelectors.finalPublishButton);
     await button.click();
     try {
-      await Promise.race([
-        this.anySelectorVisible(page, tistorySelectors.success, 8_000),
-        page.waitForURL((url) => !url.pathname.endsWith("/manage/newpost"), { timeout: 8_000 })
-      ]);
+      await this.waitForFinalConfirmation(page, urlBefore, draftCountBefore, 8_000);
       const postUrl = page.url();
       return { outcome: "confirmed", status, ...(postUrl.startsWith("http") ? { postUrl } : {}) };
     } catch {
@@ -226,20 +229,45 @@ export class TistoryBlogAutomation implements AutomationEngine {
     throw new Error(`Tistory control not found: ${selectors.join(" | ")}`);
   }
 
-  private async firstAttached(page: Page, selectors: readonly string[]) {
-    for (const selector of selectors) {
-      const locator = page.locator(selector).first();
-      if (await locator.count().catch(() => 0)) return locator;
+  private async firstEditorBody(page: Page, timeout = 3_000) {
+    for (const iframeSelector of tistorySelectors.editorIframe) {
+      const frame = page.frameLocator(iframeSelector);
+      for (const bodySelector of tistorySelectors.body) {
+        const locator = frame.locator(bodySelector).first();
+        if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+      }
     }
-    throw new Error(`Tistory control not found: ${selectors.join(" | ")}`);
+    return this.firstVisible(page, tistorySelectors.body, timeout);
   }
 
-  private async anySelectorVisible(page: Page, selectors: readonly string[], timeout: number): Promise<void> {
+  private async waitForFinalConfirmation(
+    page: Page,
+    urlBefore: string,
+    draftCountBefore: number | null,
+    timeout: number
+  ): Promise<void> {
     const started = Date.now();
     while (Date.now() - started < timeout) {
-      if (await this.anyVisible(page, selectors)) return;
+      if (await this.anyVisible(page, tistorySelectors.success)) return;
+      if (page.url() !== urlBefore && !page.url().endsWith("/manage/newpost")) return;
+      if (draftCountBefore !== null) {
+        const currentDraftCount = await this.readDraftCount(page);
+        if (currentDraftCount !== null && currentDraftCount > draftCountBefore) return;
+      }
       await page.waitForTimeout(100);
     }
-    throw new Error("Tistory success indication was not found.");
+    throw new Error("Tistory did not expose a verifiable completion signal.");
   }
+
+  private async readDraftCount(page: Page): Promise<number | null> {
+    for (const selector of tistorySelectors.draftCount) {
+      const locator = page.locator(selector).first();
+      const value = await locator.getAttribute("aria-label").catch(() => null)
+        ?? await locator.innerText().catch(() => null);
+      const match = value?.match(/\d+/);
+      if (match) return Number(match[0]);
+    }
+    return null;
+  }
+
 }
