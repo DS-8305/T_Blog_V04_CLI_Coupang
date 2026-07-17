@@ -38,4 +38,13 @@ describe("getBrowserProfilePath", () => {
     expect(getSecurityHoldPath()).toBe("C:\\Users\\tester\\AppData\\Roaming\\NBlogAuto\\security-hold.json");
     expect(electronMock.app.getPath).toHaveBeenCalledWith("userData");
   });
+
+  it("stores the target blog configuration under Electron userData", async () => {
+    electronMock.app.getPath.mockReturnValue("C:\\Users\\tester\\AppData\\Roaming\\TistoryBlogAuto");
+    const { getBlogConfigPath } = await import("../../src/main/appPaths");
+
+    expect(getBlogConfigPath()).toBe(
+      "C:\\Users\\tester\\AppData\\Roaming\\TistoryBlogAuto\\blog-config.json"
+    );
+  });
 });

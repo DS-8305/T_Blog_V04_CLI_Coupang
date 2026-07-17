@@ -1,9 +1,11 @@
 import { dialog, ipcMain } from "electron";
 import { NaverBlogAutomation } from "../automation/NaverBlogAutomation";
+import { readBlogConfig, writeBlogConfig } from "../core/blogConfig";
 import { loadPosts } from "../core/postLoader";
 import { runPosts } from "../core/runOrchestrator";
-import type { LoginActionResult, TypingSpeedName } from "../shared/types";
-import { getBrowserProfilePath, getSecurityHoldPath } from "./appPaths";
+import { resolveReview } from "../core/statusStore";
+import type { LoginActionResult, PostJob, ReviewOutcome, TypingSpeedName } from "../shared/types";
+import { getBlogConfigPath, getBrowserProfilePath, getSecurityHoldPath } from "./appPaths";
 import { LoginSessionCoordinator } from "./LoginSessionCoordinator";
 import { ManualChromeLoginLauncher } from "./ManualChromeLoginLauncher";
 
@@ -14,6 +16,7 @@ type RunResultWithOptionalReason = Awaited<ReturnType<typeof runPosts>> & {
 };
 
 export async function registerIpcHandlers(): Promise<void> {
+  const blogConfigPath = getBlogConfigPath();
   const launcher = new ManualChromeLoginLauncher();
   const coordinator = new LoginSessionCoordinator({
     launcher,
@@ -39,6 +42,28 @@ export async function registerIpcHandlers(): Promise<void> {
 
   ipcMain.handle("posts:load", async (_event, workspacePath: string) => {
     return loadPosts(workspacePath);
+  });
+
+  ipcMain.handle("blog:getConfig", async () => readBlogConfig(blogConfigPath));
+  ipcMain.handle("blog:saveConfig", async (_event, blogUrl: unknown) => {
+    if (typeof blogUrl !== "string") {
+      throw new Error("A blog URL string is required.");
+    }
+    await writeBlogConfig(blogConfigPath, { blogUrl });
+    const saved = await readBlogConfig(blogConfigPath);
+    if (!saved) throw new Error("Saved blog configuration could not be read.");
+    return saved;
+  });
+
+  ipcMain.handle("review:resolve", async (_event, job: PostJob, outcome: unknown) => {
+    if (outcome !== "already_created" && outcome !== "not_created") {
+      throw new Error("Review outcome must be already_created or not_created.");
+    }
+    if (!job || typeof job !== "object" || typeof job.folderPath !== "string") {
+      throw new Error("A valid post job is required.");
+    }
+    await resolveReview(job, outcome as ReviewOutcome);
+    return { ok: true };
   });
 
   ipcMain.handle("login:getState", async () => coordinator.getState());

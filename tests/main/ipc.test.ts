@@ -33,8 +33,12 @@ const mocks = vi.hoisted(() => {
     },
     loadPosts: vi.fn(),
     runPosts: vi.fn(),
+    readBlogConfig: vi.fn(),
+    writeBlogConfig: vi.fn(),
+    resolveReview: vi.fn(),
     getBrowserProfilePath: vi.fn(() => "profile-path"),
     getSecurityHoldPath: vi.fn(() => "security-hold-path"),
+    getBlogConfigPath: vi.fn(() => "blog-config-path"),
     launcher: { open: vi.fn(), isRunning: vi.fn(), getCdpEndpoint: vi.fn() },
     ManualChromeLoginLauncher: vi.fn(),
     attachAutomation: vi.fn(),
@@ -45,9 +49,15 @@ const mocks = vi.hoisted(() => {
 vi.mock("electron", () => ({ dialog: mocks.dialog, ipcMain: mocks.ipcMain }));
 vi.mock("../../src/core/postLoader", () => ({ loadPosts: mocks.loadPosts }));
 vi.mock("../../src/core/runOrchestrator", () => ({ runPosts: mocks.runPosts }));
+vi.mock("../../src/core/blogConfig", () => ({
+  readBlogConfig: mocks.readBlogConfig,
+  writeBlogConfig: mocks.writeBlogConfig
+}));
+vi.mock("../../src/core/statusStore", () => ({ resolveReview: mocks.resolveReview }));
 vi.mock("../../src/main/appPaths", () => ({
   getBrowserProfilePath: mocks.getBrowserProfilePath,
-  getSecurityHoldPath: mocks.getSecurityHoldPath
+  getSecurityHoldPath: mocks.getSecurityHoldPath,
+  getBlogConfigPath: mocks.getBlogConfigPath
 }));
 vi.mock("../../src/main/ManualChromeLoginLauncher", () => ({
   ManualChromeLoginLauncher: mocks.ManualChromeLoginLauncher
@@ -75,6 +85,9 @@ describe("registerIpcHandlers", () => {
     mocks.coordinator.clearSecurityHold.mockResolvedValue(mocks.snapshot);
     mocks.coordinator.enterSecurityHold.mockResolvedValue(mocks.snapshot);
     mocks.coordinator.close.mockResolvedValue(undefined);
+    mocks.readBlogConfig.mockResolvedValue(null);
+    mocks.writeBlogConfig.mockResolvedValue(undefined);
+    mocks.resolveReview.mockResolvedValue(undefined);
   });
 
   async function register() {
@@ -102,15 +115,56 @@ describe("registerIpcHandlers", () => {
       holdPath: "security-hold-path"
     });
     expect([...mocks.handlers.keys()].sort()).toEqual([
+      "blog:getConfig",
+      "blog:saveConfig",
       "login:clearSecurityHold",
       "login:getState",
       "login:openManual",
       "login:verify",
       "posts:load",
+      "review:resolve",
       "run:start",
       "run:stop",
       "workspace:select"
     ]);
+  });
+
+  it("reads and saves the single target blog configuration", async () => {
+    const config = { blogUrl: "https://sample.tistory.com" };
+    await register();
+    mocks.readBlogConfig.mockResolvedValue(config);
+
+    await expect(mocks.handlers.get("blog:getConfig")?.()).resolves.toBe(config);
+    await expect(mocks.handlers.get("blog:saveConfig")?.({}, "sample.tistory.com")).resolves.toEqual(config);
+    expect(mocks.readBlogConfig).toHaveBeenCalledWith("blog-config-path");
+    expect(mocks.writeBlogConfig).toHaveBeenCalledWith("blog-config-path", { blogUrl: "sample.tistory.com" });
+  });
+
+  it("validates blog configuration and review IPC arguments", async () => {
+    await register();
+    await expect(mocks.handlers.get("blog:saveConfig")?.({}, 42)).rejects.toThrow(/blog URL/i);
+    await expect(mocks.handlers.get("review:resolve")?.({}, {}, "unknown")).rejects.toThrow(/review outcome/i);
+    expect(mocks.writeBlogConfig).not.toHaveBeenCalled();
+    expect(mocks.resolveReview).not.toHaveBeenCalled();
+  });
+
+  it("delegates an explicit review resolution", async () => {
+    const job = {
+      id: "001",
+      folderPath: "C:\\workspace\\001",
+      contentPath: "C:\\workspace\\001\\content.txt",
+      status: "needs_review",
+      parsed: {
+        title: "Title",
+        metadata: { publication: "public", category: null, tags: [], scheduledAt: null },
+        events: [],
+        errors: []
+      }
+    };
+    await register();
+
+    await expect(mocks.handlers.get("review:resolve")?.({}, job, "not_created")).resolves.toEqual({ ok: true });
+    expect(mocks.resolveReview).toHaveBeenCalledWith(job, "not_created");
   });
 
   it("constructs coordinator automation by attaching to the manual Chrome endpoint", async () => {

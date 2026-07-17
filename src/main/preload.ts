@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { TypingSpeedName } from "../shared/types";
+import type { PostJob, ReviewOutcome, TypingSpeedName } from "../shared/types";
 
 contextBridge.exposeInMainWorld("electronAPI", {
   selectWorkspace: () => ipcRenderer.invoke("workspace:select"),
   loadPosts: (workspacePath: string) => ipcRenderer.invoke("posts:load", workspacePath),
+  getBlogConfig: () => ipcRenderer.invoke("blog:getConfig"),
+  saveBlogConfig: (blogUrl: string) => ipcRenderer.invoke("blog:saveConfig", blogUrl),
+  resolveReview: (job: PostJob, outcome: ReviewOutcome) => ipcRenderer.invoke("review:resolve", job, outcome),
   getLoginState: () => ipcRenderer.invoke("login:getState"),
   openManualLogin: () => ipcRenderer.invoke("login:openManual"),
   verifyLogin: () => ipcRenderer.invoke("login:verify"),

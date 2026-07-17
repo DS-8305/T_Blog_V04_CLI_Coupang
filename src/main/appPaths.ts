@@ -20,3 +20,7 @@ export function getBrowserProfilePath(profileName = "default"): string {
 export function getSecurityHoldPath(): string {
   return path.join(app.getPath("userData"), "security-hold.json");
 }
+
+export function getBlogConfigPath(): string {
+  return path.join(app.getPath("userData"), "blog-config.json");
+}
