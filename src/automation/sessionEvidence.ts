@@ -1,18 +1,19 @@
 export type SessionEvidence = {
   url: string;
-  hasRequiredCookies: boolean;
-  authenticatedUiVisible: boolean;
+  editorReady: boolean;
   loginFormVisible: boolean;
   securityRequirementVisible: boolean;
+  accessDeniedVisible: boolean;
 };
 
 export function classifySessionEvidence(evidence: SessionEvidence) {
   if (evidence.securityRequirementVisible) return "security" as const;
   if (
     evidence.loginFormVisible
-    || evidence.url.includes("nid.naver.com")
-    || evidence.url.includes("nidlogin.login")
+    || evidence.url.includes("accounts.kakao.com")
+    || evidence.url.includes("auth.tistory.com")
   ) return "missing" as const;
-  if (!evidence.hasRequiredCookies && !evidence.authenticatedUiVisible) return "missing" as const;
-  return "authenticated" as const;
+  if (evidence.accessDeniedVisible) return "profile_error" as const;
+  if (evidence.editorReady) return "authenticated" as const;
+  return "profile_error" as const;
 }

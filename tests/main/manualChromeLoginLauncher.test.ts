@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MANUAL_CHROME_CDP_ENDPOINT,
   ManualChromeLoginLauncher,
-  NAVER_HOME_URL,
+  TISTORY_HOME_URL,
   type ChromeChildProcess,
   type ChromeLauncherDependencies
 } from "../../src/main/ManualChromeLoginLauncher";
@@ -66,7 +66,7 @@ describe("ManualChromeLoginLauncher", () => {
         "--remote-debugging-port=9222",
         "--no-first-run",
         "--no-default-browser-check",
-        NAVER_HOME_URL
+        TISTORY_HOME_URL
       ],
       expect.objectContaining({ stdio: "ignore", windowsHide: false })
     );

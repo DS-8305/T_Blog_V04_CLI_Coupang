@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => {
     getBlogConfigPath: vi.fn(() => "blog-config-path"),
     launcher: { open: vi.fn(), isRunning: vi.fn(), getCdpEndpoint: vi.fn() },
     ManualChromeLoginLauncher: vi.fn(),
-    attachAutomation: vi.fn(),
+    attachTistoryAutomation: vi.fn(),
     LoginSessionCoordinator: vi.fn()
   };
 });
@@ -62,8 +62,8 @@ vi.mock("../../src/main/appPaths", () => ({
 vi.mock("../../src/main/ManualChromeLoginLauncher", () => ({
   ManualChromeLoginLauncher: mocks.ManualChromeLoginLauncher
 }));
-vi.mock("../../src/automation/NaverBlogAutomation", () => ({
-  NaverBlogAutomation: { attach: mocks.attachAutomation }
+vi.mock("../../src/automation/TistoryBlogAutomation", () => ({
+  TistoryBlogAutomation: { attach: mocks.attachTistoryAutomation }
 }));
 vi.mock("../../src/main/LoginSessionCoordinator", () => ({
   LoginSessionCoordinator: mocks.LoginSessionCoordinator
@@ -75,7 +75,7 @@ describe("registerIpcHandlers", () => {
     mocks.handlers.clear();
     vi.clearAllMocks();
     mocks.ManualChromeLoginLauncher.mockImplementation(() => mocks.launcher);
-    mocks.attachAutomation.mockReturnValue(mocks.automation);
+    mocks.attachTistoryAutomation.mockReturnValue(mocks.automation);
     mocks.LoginSessionCoordinator.mockImplementation(() => mocks.coordinator);
     mocks.coordinator.initialize.mockResolvedValue(mocks.snapshot);
     mocks.coordinator.getState.mockReturnValue(mocks.snapshot);
@@ -168,11 +168,23 @@ describe("registerIpcHandlers", () => {
   });
 
   it("constructs coordinator automation by attaching to the manual Chrome endpoint", async () => {
+    mocks.readBlogConfig.mockResolvedValue({ blogUrl: "https://sample.tistory.com" });
     await register();
     const dependencies = mocks.LoginSessionCoordinator.mock.calls[0][0];
 
     expect(dependencies.createAutomation("http://127.0.0.1:9222")).toBe(mocks.automation);
-    expect(mocks.attachAutomation).toHaveBeenCalledWith("http://127.0.0.1:9222");
+    expect(mocks.attachTistoryAutomation).toHaveBeenCalledWith(
+      "http://127.0.0.1:9222",
+      "https://sample.tistory.com"
+    );
+  });
+
+  it("requires a configured blog before creating attached automation", async () => {
+    await register();
+    const dependencies = mocks.LoginSessionCoordinator.mock.calls[0][0];
+
+    expect(() => dependencies.createAutomation("http://127.0.0.1:9222")).toThrow(/blog URL/i);
+    expect(mocks.attachTistoryAutomation).not.toHaveBeenCalled();
   });
 
   it("delegates explicit login commands to the coordinator", async () => {
@@ -247,14 +259,14 @@ describe("registerIpcHandlers", () => {
     mocks.runPosts.mockResolvedValue({
       stopped: true,
       reason: "security",
-      message: "Naver requires login or security verification. Automation stopped."
+      message: "Tistory requires login or security verification. Automation stopped."
     });
 
     await mocks.handlers.get("run:start")?.({}, "C:\\workspace", "normal");
     expect(mocks.runPosts.mock.calls[0][2]).toMatchObject({ closeEngine: false });
     expect(mocks.coordinator.enterSecurityHold).toHaveBeenCalledOnce();
     expect(mocks.coordinator.enterSecurityHold).toHaveBeenCalledWith(
-      "Naver requires login or security verification. Automation stopped."
+      "Tistory requires login or security verification. Automation stopped."
     );
     expect(mocks.coordinator.close).not.toHaveBeenCalled();
     expect(mocks.automation.close).toHaveBeenCalledOnce();

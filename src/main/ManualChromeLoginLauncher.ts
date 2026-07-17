@@ -1,9 +1,9 @@
 import { spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
 import { access as nodeAccess } from "node:fs/promises";
 import path from "node:path";
-import { NAVER_HOME_URL } from "../automation/selectors";
+import { TISTORY_HOME_URL } from "../automation/tistorySelectors";
 
-export { NAVER_HOME_URL } from "../automation/selectors";
+export { TISTORY_HOME_URL } from "../automation/tistorySelectors";
 export const MANUAL_CHROME_CDP_ENDPOINT = "http://127.0.0.1:9222";
 
 export interface ChromeChildProcess {
@@ -74,7 +74,7 @@ export class ManualChromeLoginLauncher {
           "--remote-debugging-port=9222",
           "--no-first-run",
           "--no-default-browser-check",
-          NAVER_HOME_URL
+          TISTORY_HOME_URL
         ],
         { stdio: "ignore", windowsHide: false }
       );

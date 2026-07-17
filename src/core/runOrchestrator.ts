@@ -11,7 +11,7 @@ const STOPPED_MESSAGE = "Run stopped by user";
 
 export type RunResult = {
   stopped: boolean;
-  reason?: AutomationFailureReason | "stopped";
+  reason?: AutomationFailureReason | "stopped" | "needs_review";
   message: string;
 };
 
@@ -24,7 +24,7 @@ type RunOptions = {
   maxPosts?: number;
 };
 
-type SaveResult = AutomationResult | { ok: false; retryable: false; reason: "stopped"; message: string };
+type SaveResult = AutomationResult | { outcome: "stopped"; message: string };
 
 export async function runPosts(
   jobs: PostJob[],
@@ -52,38 +52,53 @@ export async function runPosts(
 
       let result: SaveResult;
       if (options.signal?.aborted) {
-        result = { ok: false, retryable: false, reason: "stopped", message: STOPPED_MESSAGE };
+        result = { outcome: "stopped", message: STOPPED_MESSAGE };
       } else {
         result = await saveDraftSafely(engine, job, options);
         if (options.signal?.aborted) {
-          result = { ok: false, retryable: false, reason: "stopped", message: STOPPED_MESSAGE };
+          result = { outcome: "stopped", message: STOPPED_MESSAGE };
         }
       }
-      if (!result.ok) {
+      if (result.outcome === "uncertain") {
         await writePostStatus(job.folderPath, {
-          status: result.reason === "stopped" ? "stopped" : "failed",
+          status: "needs_review",
+          startedAt,
+          finishedAt: new Date().toISOString(),
+          publication: job.parsed.metadata.publication,
+          message: result.message
+        });
+        await appendPostLog(job.folderPath, `Needs review: ${result.message}`);
+        return { stopped: true, reason: "needs_review", message: result.message };
+      }
+
+      if (result.outcome === "failed" || result.outcome === "stopped") {
+        const reason = result.outcome === "stopped" ? "stopped" : result.reason;
+        await writePostStatus(job.folderPath, {
+          status: reason === "stopped" ? "stopped" : "failed",
           startedAt,
           finishedAt: new Date().toISOString(),
           message: result.message
         });
         await appendPostLog(job.folderPath, `Failed: ${result.message}`);
-        return { stopped: true, reason: result.reason, message: result.message };
+        return { stopped: true, reason, message: result.message };
       }
 
       await writePostStatus(job.folderPath, {
-        status: "draft_saved",
+        status: result.status,
         startedAt,
         finishedAt: new Date().toISOString(),
-        message: "Draft saved successfully"
+        publication: job.parsed.metadata.publication,
+        ...(result.postUrl ? { postUrl: result.postUrl } : {}),
+        message: `Tistory post completed: ${result.status}`
       });
-      await appendPostLog(job.folderPath, "Draft saved successfully");
+      await appendPostLog(job.folderPath, `Tistory post completed: ${result.status}`);
       await writeSuccessMarker(job.folderPath);
-      options.onLog?.(`Saved draft for ${job.id}`);
+      options.onLog?.(`Completed ${job.id}: ${result.status}`);
       processedCount += 1;
     }
 
     completedSuccessfully = true;
-    return { stopped: false, message: "All eligible posts saved as drafts" };
+    return { stopped: false, message: "All eligible Tistory posts completed" };
   } finally {
     if (options.closeEngine !== false && (!completedSuccessfully || options.closeOnSuccess !== false)) {
       try {
@@ -104,7 +119,7 @@ async function saveDraftSafely(
     return await engine.saveDraft(job, options);
   } catch (error) {
     return {
-      ok: false as const,
+      outcome: "failed" as const,
       retryable: false,
       reason: "editor" as const,
       message: error instanceof Error ? error.message : String(error)

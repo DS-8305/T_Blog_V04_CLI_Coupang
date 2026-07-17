@@ -53,7 +53,7 @@
       "target": [
         "portable"
       ],
-      "artifactName": "Naver-Blog-Automation-${version}-portable.${ext}"
+      "artifactName": "Tistory-Blog-Automation-${version}-portable.${ext}"
     },
     "portable": {
       "unpackDirName": false,

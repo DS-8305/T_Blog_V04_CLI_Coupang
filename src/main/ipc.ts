@@ -1,5 +1,5 @@
 import { dialog, ipcMain } from "electron";
-import { NaverBlogAutomation } from "../automation/NaverBlogAutomation";
+import { TistoryBlogAutomation } from "../automation/TistoryBlogAutomation";
 import { readBlogConfig, writeBlogConfig } from "../core/blogConfig";
 import { loadPosts } from "../core/postLoader";
 import { runPosts } from "../core/runOrchestrator";
@@ -17,10 +17,14 @@ type RunResultWithOptionalReason = Awaited<ReturnType<typeof runPosts>> & {
 
 export async function registerIpcHandlers(): Promise<void> {
   const blogConfigPath = getBlogConfigPath();
+  let blogConfig = await readBlogConfig(blogConfigPath);
   const launcher = new ManualChromeLoginLauncher();
   const coordinator = new LoginSessionCoordinator({
     launcher,
-    createAutomation: (cdpEndpoint) => NaverBlogAutomation.attach(cdpEndpoint),
+    createAutomation: (cdpEndpoint) => {
+      if (!blogConfig) throw new Error("Configure the Tistory blog URL before verifying login.");
+      return TistoryBlogAutomation.attach(cdpEndpoint, blogConfig.blogUrl);
+    },
     profilePath: getBrowserProfilePath(),
     holdPath: getSecurityHoldPath()
   });
@@ -44,7 +48,10 @@ export async function registerIpcHandlers(): Promise<void> {
     return loadPosts(workspacePath);
   });
 
-  ipcMain.handle("blog:getConfig", async () => readBlogConfig(blogConfigPath));
+  ipcMain.handle("blog:getConfig", async () => {
+    blogConfig = await readBlogConfig(blogConfigPath);
+    return blogConfig;
+  });
   ipcMain.handle("blog:saveConfig", async (_event, blogUrl: unknown) => {
     if (typeof blogUrl !== "string") {
       throw new Error("A blog URL string is required.");
@@ -52,6 +59,7 @@ export async function registerIpcHandlers(): Promise<void> {
     await writeBlogConfig(blogConfigPath, { blogUrl });
     const saved = await readBlogConfig(blogConfigPath);
     if (!saved) throw new Error("Saved blog configuration could not be read.");
+    blogConfig = saved;
     return saved;
   });
 

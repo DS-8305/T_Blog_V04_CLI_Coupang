@@ -1,79 +1,25 @@
-# Manual Test Checklist
+# 티스토리 수동 테스트 체크리스트
 
-## Test Workspace
+## 안전 전제
 
-Create a local workspace with this shape:
+- 실제 공개/예약 발행은 사용자가 그 시점에 별도로 승인한 경우에만 테스트한다.
+- Kakao 아이디와 비밀번호를 앱에 입력하거나 파일·로그에 기록하지 않는다.
+- 전용 Chrome에서 직접 로그인하며 보안 확인이나 CAPTCHA가 나오면 자동화를 중지한다.
+- 테스트 기본값은 실행 개수 1, `[PUBLISH]draft[/PUBLISH]`이다.
 
-```text
-workspace/
-  posts/
-    001-first-post/
-      content.txt
-      images/
-        hero.png
-```
+## 비발행 점검
 
-Use this `content.txt`:
+- 앱에서 `https://<name>.tistory.com` 형식의 주소만 저장된다.
+- 전용 Chrome이 `127.0.0.1:9222` CDP로 열리고 기존 기본 Chrome 프로필을 사용하지 않는다.
+- 로그인 확인 시 설정한 블로그의 `/manage/newpost` 화면과 편집기 쓰기 권한을 확인한다.
+- 실행 전 확인 창에 제목, 임시저장/즉시 공개/예약 공개, 예약 시간이 정확히 나온다.
+- `[H2]`가 티스토리 `제목1`(H2) 블록으로 입력된다.
+- `[QUOTE]`는 실행되지 않고 `[H2]`로 교체하라는 검증 오류가 표시된다.
+- 결과 확인이 불분명하면 재클릭하지 않고 `needs_review`로 중단된다.
 
-```text
-[TITLE]임시저장 테스트 글[/TITLE]
+## 승인 후 실제 점검
 
-일반 문단입니다.
-
-[BOLD]굵게 들어가는 문장입니다.[/BOLD]
-
-[QUOTE]
-인용구 문장입니다.
-여러 줄 인용을 확인합니다.
-[/QUOTE]
-
-[HR]
-
-[IMAGE:images/hero.png]
-
-이미지 아래 문단입니다.
-```
-
-## App Checks
-
-- App opens without renderer errors.
-- Click `작업 폴더 선택` and choose the workspace root.
-- `글 목록` shows `001-first-post`.
-- Validation column shows `정상`.
-- Click `브라우저 열기 / 로그인`.
-- Chrome opens with the dedicated app profile.
-- User can log in to Naver manually.
-- Select a typing speed: `빠름`, `보통`, or `느림`.
-- Click `시작`.
-- The app keeps the run controls disabled while running.
-- Click `중지` during a run and confirm the app returns to idle state.
-
-## Naver Blog Checks
-
-- The browser opens the Naver Blog writing page.
-- Title is entered into the title field.
-- Normal paragraph text is typed into the body.
-- Bold marker text is inserted with bold formatting.
-- Quote marker text is inserted through the quote feature.
-- Divider marker inserts a divider.
-- Image marker opens the image upload flow and inserts `images/hero.png`.
-- Final paragraph is typed after the image.
-- The post is not published.
-- The post is saved as a draft.
-
-## Local Output Checks
-
-- `posts/001-first-post/status.json` exists.
-- `status.json` ends with `draft_saved` after a successful run.
-- `posts/001-first-post/run-log.txt` exists.
-- `run-log.txt` contains start and draft-save result messages.
-- If login/security verification blocks writing, status is `failed` and the log explains the issue.
-
-## Regression Checks
-
-- A workspace without `posts/` does not start a run silently.
-- A post without `[TITLE]...[/TITLE]` is marked as `검증 오류`.
-- A post with a missing image is marked as `검증 오류`.
-- Multiple post folders run in folder-name order.
-- A transient browser failure is retried before the run is marked failed.
-- A non-retryable login/security failure stops the run.
+- 임시저장 1건: 제목, 본문, 제목1, 굵게, 구분선, 이미지, 카테고리, 태그를 확인한다.
+- 즉시 공개 1건: 별도 승인 후 공개 URL과 `published` 상태를 확인한다.
+- 예약 공개 1건: 별도 승인 후 Asia/Seoul 예약 시간과 `scheduled` 상태를 확인한다.
+- `needs_review`에서 티스토리 글 목록을 직접 본 뒤 `이미 생성됨` 또는 `생성 안 됨`을 선택한다.

@@ -10,7 +10,8 @@ body {
 }
 
 button,
-select {
+select,
+input {
   border: 1px solid #c8ced8;
   border-radius: 6px;
   background: #ffffff;
@@ -18,6 +19,25 @@ select {
   font: inherit;
   padding: 8px 12px;
 }
+
+.config-card {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.config-card label { flex: 1; display: grid; gap: 7px; }
+.primary { background: #ff5544; border-color: #ff5544; color: white; }
+.publication-public td, .publication-scheduled td { background: #fffaf0; }
+.status-published, .status-scheduled { background: #dcfae6; color: #067647; }
+.status-needs_review { background: #fef0c7; color: #b54708; }
+.review-actions { display: flex; gap: 6px; }
+.error-text { margin-top: 5px; color: #b42318; font-size: 12px; }
 
 button {
   cursor: pointer;

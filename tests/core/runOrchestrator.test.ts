@@ -22,6 +22,58 @@ function makeJob(folderPath: string): PostJob {
 }
 
 describe("runPosts", () => {
+  it("records needs_review and stops without retrying an uncertain final action", async () => {
+    const folder = await fs.mkdtemp(path.join(os.tmpdir(), "run-uncertain-"));
+    const laterFolder = await fs.mkdtemp(path.join(os.tmpdir(), "run-uncertain-later-"));
+    let calls = 0;
+    const engine: AutomationEngine = {
+      async verifySession() { return { ok: true }; },
+      async saveDraft() {
+        calls += 1;
+        return { outcome: "uncertain", message: "Check the Tistory post list" };
+      },
+      async close() {}
+    };
+
+    const result = await runPosts([makeJob(folder), makeJob(laterFolder)], engine, { speed: "normal" });
+
+    expect(result).toEqual({
+      stopped: true,
+      reason: "needs_review",
+      message: "Check the Tistory post list"
+    });
+    expect(calls).toBe(1);
+    const status = JSON.parse(await fs.readFile(path.join(folder, "status.json"), "utf8"));
+    expect(status).toMatchObject({ status: "needs_review", publication: "draft" });
+    await expect(fs.access(path.join(folder, "_SUCCESS.done"))).rejects.toThrow();
+  });
+
+  it("persists the confirmed publication status and URL", async () => {
+    const folder = await fs.mkdtemp(path.join(os.tmpdir(), "run-published-"));
+    const job = makeJob(folder);
+    job.parsed.metadata.publication = "public";
+    const engine: AutomationEngine = {
+      async verifySession() { return { ok: true }; },
+      async saveDraft() {
+        return {
+          outcome: "confirmed",
+          status: "published",
+          postUrl: "https://sample.tistory.com/1"
+        };
+      },
+      async close() {}
+    };
+
+    await runPosts([job], engine, { speed: "normal" });
+
+    const status = JSON.parse(await fs.readFile(path.join(folder, "status.json"), "utf8"));
+    expect(status).toMatchObject({
+      status: "published",
+      publication: "public",
+      postUrl: "https://sample.tistory.com/1"
+    });
+  });
+
   it("processes pending posts sequentially and records draft_saved", async () => {
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "run-post-a-"));
     const secondFolder = await fs.mkdtemp(path.join(os.tmpdir(), "run-post-b-"));
@@ -31,7 +83,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft(job) {
         calls.push(job.id);
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {
         closeCalls += 1;
@@ -54,7 +106,7 @@ describe("runPosts", () => {
     const engine: AutomationEngine = {
       async verifySession() { return { ok: true }; },
       async saveDraft() {
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {
         closed = true;
@@ -74,7 +126,7 @@ describe("runPosts", () => {
     const engine: AutomationEngine = {
       async verifySession() { return { ok: true }; },
       async saveDraft() {
-        return { ok: false, retryable: false, reason: "editor", message: "Editor failed" };
+        return { outcome: "failed", retryable: false, reason: "editor", message: "Editor failed" };
       },
       async close() {
         closeCalls += 1;
@@ -96,7 +148,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft(_job, options) {
         options.onLog?.("custom automation step");
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {}
     };
@@ -106,7 +158,7 @@ describe("runPosts", () => {
     expect(messages).toEqual([
       `Starting ${path.basename(folder)}`,
       "custom automation step",
-      `Saved draft for ${path.basename(folder)}`
+      `Completed ${path.basename(folder)}: draft_saved`
     ]);
   });
 
@@ -119,7 +171,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft(job) {
         calls.push(job.id);
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {}
     };
@@ -144,7 +196,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft() {
         attempts += 1;
-        return { ok: false, retryable: true, reason: "editor", message: "Editor failed" };
+        return { outcome: "failed", retryable: true, reason: "editor", message: "Editor failed" };
       },
       async close() {}
     };
@@ -170,7 +222,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft(job) {
         calls.push(job.id);
-        return { ok: false, retryable: false, reason: "missing_session", message: "Login required" };
+        return { outcome: "failed", retryable: false, reason: "missing_session", message: "Login required" };
       },
       async close() {
         closed = true;
@@ -194,7 +246,7 @@ describe("runPosts", () => {
     const engine: AutomationEngine = {
       async verifySession() { return { ok: true }; },
       async saveDraft() {
-        return { ok: false, retryable: false, reason: "editor", message: "Editor failed" };
+        return { outcome: "failed", retryable: false, reason: "editor", message: "Editor failed" };
       },
       async close() {
         closeCalls += 1;
@@ -241,7 +293,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft(saveJob) {
         calls.push(saveJob.id);
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {}
     };
@@ -259,7 +311,7 @@ describe("runPosts", () => {
       async verifySession() { return { ok: true }; },
       async saveDraft() {
         controller.abort();
-        return { ok: true };
+        return { outcome: "confirmed", status: "draft_saved" };
       },
       async close() {}
     };

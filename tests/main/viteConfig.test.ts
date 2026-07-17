@@ -16,6 +16,7 @@ describe("Vite configuration", () => {
     expect(packageJson.description).toContain("Tistory Blog");
     expect(packageJson.build.appId).toBe("com.ds8305.tistoryblogv01");
     expect(packageJson.build.productName).toBe("Tistory Blog Automation");
+    expect(packageJson.build.win.artifactName).toBe("Tistory-Blog-Automation-${version}-portable.${ext}");
     expect(html).toContain("<title>Tistory Blog Automation</title>");
     expect(app).toContain("<h1>Tistory Blog Automation</h1>");
   });

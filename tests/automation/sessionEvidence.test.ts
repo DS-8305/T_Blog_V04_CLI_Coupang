@@ -2,43 +2,43 @@ import { describe, expect, it } from "vitest";
 import { classifySessionEvidence } from "../../src/automation/sessionEvidence";
 
 describe("classifySessionEvidence", () => {
-  it("classifies complete cookies without login or security UI as authenticated", () => {
+  it("classifies a ready Tistory editor as authenticated", () => {
     expect(classifySessionEvidence({
-      url: "https://www.naver.com/",
-      hasRequiredCookies: true,
-      authenticatedUiVisible: false,
+      url: "https://sample.tistory.com/manage/newpost",
+      editorReady: true,
       loginFormVisible: false,
-      securityRequirementVisible: false
+      securityRequirementVisible: false,
+      accessDeniedVisible: false
     })).toBe("authenticated");
   });
 
-  it("accepts an explicit logout control when legacy session cookies are absent", () => {
+  it("classifies a Kakao login page as missing", () => {
     expect(classifySessionEvidence({
-      url: "https://www.naver.com/",
-      hasRequiredCookies: false,
-      authenticatedUiVisible: true,
-      loginFormVisible: false,
-      securityRequirementVisible: false
-    })).toBe("authenticated");
-  });
-
-  it("classifies an ordinary missing login as missing", () => {
-    expect(classifySessionEvidence({
-      url: "https://nid.naver.com/nidlogin.login",
-      hasRequiredCookies: false,
-      authenticatedUiVisible: false,
+      url: "https://accounts.kakao.com/login/",
+      editorReady: false,
       loginFormVisible: true,
-      securityRequirementVisible: false
+      securityRequirementVisible: false,
+      accessDeniedVisible: false
     })).toBe("missing");
+  });
+
+  it("classifies inaccessible blog writing as profile_error", () => {
+    expect(classifySessionEvidence({
+      url: "https://sample.tistory.com/manage/newpost",
+      editorReady: false,
+      loginFormVisible: false,
+      securityRequirementVisible: false,
+      accessDeniedVisible: true
+    })).toBe("profile_error");
   });
 
   it("gives security evidence priority over cookies and login UI", () => {
     expect(classifySessionEvidence({
-      url: "https://nid.naver.com/nidlogin.login",
-      hasRequiredCookies: true,
-      authenticatedUiVisible: true,
+      url: "https://accounts.kakao.com/login/",
+      editorReady: false,
       loginFormVisible: true,
-      securityRequirementVisible: true
+      securityRequirementVisible: true,
+      accessDeniedVisible: false
     })).toBe("security");
   });
 });
