@@ -22,6 +22,12 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
         contentPath,
         parsed: {
           title: "",
+          metadata: {
+            publication: "draft",
+            category: null,
+            tags: [],
+            scheduledAt: null
+          },
           events: [],
           errors: [
             {

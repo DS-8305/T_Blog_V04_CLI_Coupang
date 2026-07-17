@@ -14,6 +14,7 @@ function makeJob(folderPath: string): PostJob {
     status: "pending",
     parsed: {
       title: "Title",
+      metadata: { publication: "draft", category: null, tags: [], scheduledAt: null },
       errors: [],
       events: [{ type: "setTitle", text: "Title" }, { type: "typeText", text: "Body" }]
     }

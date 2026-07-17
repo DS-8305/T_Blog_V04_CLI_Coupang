@@ -50,7 +50,12 @@ const testJob: PostJob = {
   folderPath: ".",
   contentPath: "content.txt",
   status: "pending",
-  parsed: { title: "", events: [], errors: [] }
+  parsed: {
+    title: "",
+    metadata: { publication: "draft", category: null, tags: [], scheduledAt: null },
+    events: [],
+    errors: []
+  }
 };
 
 function createBrowserHarness(options: {

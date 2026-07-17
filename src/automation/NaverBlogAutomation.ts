@@ -251,15 +251,15 @@ export class NaverBlogAutomation implements AutomationEngine {
         onLog?.(`${postId}: entering body text`);
         await this.typeInBody(page, event.text, profile);
         break;
+      case "typeHeading1":
+        onLog?.(`${postId}: entering heading text with legacy plain-text fallback`);
+        await this.typeInBody(page, event.text, profile);
+        break;
       case "typeBold":
         onLog?.(`${postId}: entering bold text`);
         await this.clickToolbar(page, editorSelectors.bold, editorSelectors.boldButtonNames);
         await this.typeInBody(page, event.text, profile);
         await this.clickToolbar(page, editorSelectors.bold, editorSelectors.boldButtonNames);
-        break;
-      case "insertQuote":
-        onLog?.(`${postId}: entering quote`);
-        await this.insertQuote(page, event.text, profile, onLog);
         break;
       case "insertDivider":
         onLog?.(`${postId}: inserting divider`);

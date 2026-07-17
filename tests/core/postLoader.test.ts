@@ -44,8 +44,8 @@ describe("loadPosts", () => {
       "001-session-reuse",
       "002-marker-coverage",
       "003-sequential-draft",
-      "004-quote2-only",
-      "005-quote2-image-flow",
+      "004-heading1-only",
+      "005-heading1-image-flow",
       "006-title-body-focus"
     ]) {
       const postFolder = path.join(workspace, id);
@@ -57,7 +57,7 @@ describe("loadPosts", () => {
           "",
           "Normal paragraph.",
           "",
-          "[QUOTE]Quote sentence.[/QUOTE]",
+          "[H2]Heading sentence.[/H2]",
           "",
           "[HR]",
           "",
@@ -74,8 +74,8 @@ describe("loadPosts", () => {
       "001-session-reuse",
       "002-marker-coverage",
       "003-sequential-draft",
-      "004-quote2-only",
-      "005-quote2-image-flow",
+      "004-heading1-only",
+      "005-heading1-image-flow",
       "006-title-body-focus"
     ]);
     expect(posts.every((post) => post.status === "pending")).toBe(true);

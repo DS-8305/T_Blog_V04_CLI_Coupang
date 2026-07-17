@@ -5,17 +5,18 @@ import { parseContent } from "../../src/core/parser";
 const postFolder = path.resolve("tests/fixtures/valid-workspace/posts/001-first-post");
 
 describe("parseContent", () => {
-  it("parses title and supported editor events", () => {
+  it("parses Tistory metadata and supported editor events", () => {
     const input = `[TITLE]First post title[/TITLE]
+[PUBLISH]scheduled[/PUBLISH]
+[CATEGORY]여행[/CATEGORY]
+[TAGS]서울, 맛집,  주말여행  [/TAGS]
+[SCHEDULE]2026-07-20 09:00[/SCHEDULE]
 
 Normal paragraph text.
 
 [BOLD]Bold sentence.[/BOLD]
 
-[QUOTE]
-Quoted text.
-Multiple lines are allowed.
-[/QUOTE]
+[H2]첫 번째 소제목[/H2]
 
 [HR]
 
@@ -23,15 +24,21 @@ Multiple lines are allowed.
 
 Text after image.`;
 
-    const result = parseContent(input, postFolder);
+    const result = parseContent(input, postFolder, new Date("2026-07-17T00:00:00+09:00"));
 
     expect(result.errors).toEqual([]);
     expect(result.title).toBe("First post title");
+    expect(result.metadata).toEqual({
+      publication: "scheduled",
+      category: "여행",
+      tags: ["서울", "맛집", "주말여행"],
+      scheduledAt: "2026-07-20T09:00:00+09:00"
+    });
     expect(result.events).toEqual([
       { type: "setTitle", text: "First post title" },
       { type: "typeText", text: "Normal paragraph text." },
       { type: "typeBold", text: "Bold sentence." },
-      { type: "insertQuote", text: "Quoted text.\nMultiple lines are allowed." },
+      { type: "typeHeading1", text: "첫 번째 소제목" },
       { type: "insertDivider" },
       {
         type: "insertImage",
@@ -40,6 +47,60 @@ Text after image.`;
       },
       { type: "typeText", text: "Text after image." }
     ]);
+  });
+
+  it("defaults publication metadata to a draft", () => {
+    const result = parseContent("[TITLE]A[/TITLE]\nBody", postFolder);
+
+    expect(result.metadata).toEqual({
+      publication: "draft",
+      category: null,
+      tags: [],
+      scheduledAt: null
+    });
+  });
+
+  it("requires a schedule for scheduled publication", () => {
+    const result = parseContent("[TITLE]A[/TITLE]\n[PUBLISH]scheduled[/PUBLISH]\nBody", postFolder);
+
+    expect(result.errors).toContainEqual({
+      code: "missing_schedule",
+      message: "Scheduled posts require [SCHEDULE]YYYY-MM-DD HH:mm[/SCHEDULE]."
+    });
+  });
+
+  it("rejects a past scheduled publication time in Asia/Seoul", () => {
+    const result = parseContent(
+      "[TITLE]A[/TITLE]\n[PUBLISH]scheduled[/PUBLISH]\n[SCHEDULE]2026-07-16 09:00[/SCHEDULE]",
+      postFolder,
+      new Date("2026-07-17T00:00:00+09:00")
+    );
+
+    expect(result.errors).toContainEqual({
+      code: "past_schedule",
+      message: "Scheduled publication time must be in the future."
+    });
+  });
+
+  it("rejects schedule metadata for a non-scheduled post", () => {
+    const result = parseContent(
+      "[TITLE]A[/TITLE]\n[PUBLISH]public[/PUBLISH]\n[SCHEDULE]2026-07-20 09:00[/SCHEDULE]",
+      postFolder
+    );
+
+    expect(result.errors).toContainEqual({
+      code: "unexpected_schedule",
+      message: "[SCHEDULE] is only valid when [PUBLISH] is scheduled."
+    });
+  });
+
+  it("rejects QUOTE with H2 migration guidance", () => {
+    const result = parseContent("[TITLE]A[/TITLE]\n[QUOTE]old subtitle[/QUOTE]", postFolder);
+
+    expect(result.errors).toContainEqual({
+      code: "unsupported_quote",
+      message: "[QUOTE] is not supported. Replace it with [H2]...[/H2]."
+    });
   });
 
   it("reports missing title", () => {
@@ -121,7 +182,7 @@ Text after image.`;
   });
 
   it("reports unmatched paired closing tags", () => {
-    const result = parseContent("[TITLE]A[/TITLE]\nText[/BOLD]\n[QUOTE]quote[/BOLD]\n[/TITLE]", postFolder);
+    const result = parseContent("[TITLE]A[/TITLE]\nText[/BOLD]\n[H2]heading[/BOLD]\n[/TITLE]", postFolder);
     expect(result.errors).toEqual([
       {
         code: "unmatched_closing_tag",
@@ -137,7 +198,7 @@ Text after image.`;
       },
       {
         code: "unclosed_tag",
-        message: "Missing closing tag: [/QUOTE]"
+        message: "Missing closing tag: [/H2]"
       }
     ]);
   });

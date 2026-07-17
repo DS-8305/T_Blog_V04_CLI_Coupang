@@ -6,11 +6,20 @@ export type TypingSpeedProfile = {
   blockPauseMs: number;
 };
 
+export type PublicationMode = "draft" | "public" | "scheduled";
+
+export type PostMetadata = {
+  publication: PublicationMode;
+  category: string | null;
+  tags: string[];
+  scheduledAt: string | null;
+};
+
 export type EditorEvent =
   | { type: "setTitle"; text: string }
   | { type: "typeText"; text: string }
+  | { type: "typeHeading1"; text: string }
   | { type: "typeBold"; text: string }
-  | { type: "insertQuote"; text: string }
   | { type: "insertDivider" }
   | { type: "insertImage"; relativePath: string; absolutePath: string };
 
@@ -21,6 +30,7 @@ export type ValidationError = {
 
 export type ParsedPost = {
   title: string;
+  metadata: PostMetadata;
   events: EditorEvent[];
   errors: ValidationError[];
 };
