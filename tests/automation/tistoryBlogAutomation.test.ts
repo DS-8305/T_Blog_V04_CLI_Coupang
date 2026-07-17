@@ -214,6 +214,10 @@ function createDuplicateAttachPage(actions: string[]) {
 }
 
 describe("TistoryBlogAutomation finalization", () => {
+  it("targets Tistory's anchor-based 임시저장 action", () => {
+    expect(tistorySelectors.draftButton[0]).toBe("a.action[role='button']:has-text('임시저장')");
+  });
+
   it("confirms a draft when Tistory increments the saved-draft count", async () => {
     const page = createDraftFinalizationPage();
     const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");

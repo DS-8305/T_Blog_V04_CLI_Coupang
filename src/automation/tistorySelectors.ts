@@ -29,7 +29,11 @@ export const tistorySelectors = {
   photoMenuItem: ["[role='menuitem']:has-text('사진')"],
   categoryButton: ["button:has-text('카테고리')", "button[aria-label*='카테고리']"],
   tagInput: ["input[placeholder*='태그']", "input[aria-label*='태그']"],
-  draftButton: ["button:has-text('임시저장')", "button:has-text('저장')"],
+  draftButton: [
+    "a.action[role='button']:has-text('임시저장')",
+    "[role='button'].action:has-text('임시저장')",
+    "button:has-text('임시저장')"
+  ],
   draftCount: ["button.count[aria-label^='임시저장 개수']"],
   completeButton: ["button:has-text('완료')", "button:has-text('발행')"],
   publicOption: ["label:has-text('공개')", "button:has-text('공개')"],
