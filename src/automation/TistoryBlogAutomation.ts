@@ -127,8 +127,9 @@ export class TistoryBlogAutomation implements AutomationEngine {
       await page.keyboard.press("Enter");
     } else if (event.type === "insertDivider") {
       await (await this.firstVisible(page, tistorySelectors.divider)).click();
-      await page.keyboard.press("End");
-      await page.keyboard.press("Enter");
+      await (await this.firstVisible(page, tistorySelectors.dividerStyle1)).click();
+      await body.press("Control+End");
+      await body.press("Enter");
     } else if (event.type === "insertImage") {
       const imagesBefore = await body.locator("img").count();
       await (await this.firstVisible(page, tistorySelectors.attach)).click();

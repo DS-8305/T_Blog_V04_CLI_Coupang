@@ -118,6 +118,16 @@ describe("TistoryBlogAutomation editor events", () => {
     ]);
   });
 
+  it("selects Tistory divider style1 after opening the divider menu", async () => {
+    const actions: string[] = [];
+    const page = createEditorPage(actions);
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+
+    await automation.executeEvent(page as never, { type: "insertDivider" }, speed);
+
+    expect(actions).toContain("click:[role='menuitem']:has-text('구분선 style1')");
+  });
+
   it("opens 첨부 then 사진 and assigns the image through the file chooser once", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
@@ -284,6 +294,7 @@ function createEditorPage(actions: string[]) {
     tistorySelectors.formatMenu[0],
     tistorySelectors.heading1[0],
     tistorySelectors.divider[0],
+    tistorySelectors.dividerStyle1[0],
     tistorySelectors.attach[0],
     tistorySelectors.photoMenuItem[0]
   ]);

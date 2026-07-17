@@ -25,6 +25,10 @@ export const tistorySelectors = {
   formatMenu: ["[aria-label='문단모양']", ".mce-menubtn[aria-haspopup='true']"],
   heading1: ["[role='menuitem']:has-text('제목1')", "button:has-text('제목1')", "span:has-text('제목1')"],
   divider: ["[aria-label='구분선']"],
+  dividerStyle1: [
+    "[role='menuitem']:has-text('구분선 style1')",
+    ".mce-hr:has(.mce-i-hr-style1)"
+  ],
   attach: ["[aria-label='첨부']"],
   photoMenuItem: ["[role='menuitem']:has-text('사진')"],
   categoryButton: ["button:has-text('카테고리')", "button[aria-label*='카테고리']"],
