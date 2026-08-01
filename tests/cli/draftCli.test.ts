@@ -135,7 +135,7 @@ describe("Tistory draft CLI", () => {
       loadPosts: vi.fn(async () => [pendingJob]),
       applyPolicy: vi.fn(async () => [pendingJob]),
       attachAutomation: () => automation,
-      runPosts: vi.fn(async () => ({ stopped: true, reason: "editor", message: "Editor stopped." })),
+      runPosts: vi.fn(async () => ({ stopped: true, reason: "editor" as const, message: "Editor stopped." })),
       error: (message) => errors.push(message)
     });
 
