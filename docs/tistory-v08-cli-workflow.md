@@ -13,7 +13,7 @@
 CLI는 portable 앱과 같은 Chrome 프로필을 사용합니다.
 
 ```text
-%APPDATA%\Tistory Blog Automation\browser-profile
+%APPDATA%\tistory-blog-auto-v01\browser-profile
 ```
 
 portable 앱과 CLI가 같은 프로필을 동시에 새로 열지 않도록 합니다. 이미 전용 Chrome이 `127.0.0.1:9222`에서 실행 중이면 `draft:login`은 두 번째 Chrome을 열지 않고 기존 창을 사용합니다.

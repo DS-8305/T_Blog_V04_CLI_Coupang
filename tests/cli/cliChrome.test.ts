@@ -14,7 +14,7 @@ describe("Tistory CLI Chrome", () => {
       "C:\\Users\\fallback"
     )).toBe(path.join(
       "C:\\Users\\me\\AppData\\Roaming",
-      "Tistory Blog Automation",
+      "tistory-blog-auto-v01",
       "browser-profile"
     ));
   });
@@ -24,7 +24,7 @@ describe("Tistory CLI Chrome", () => {
       "C:\\Users\\fallback",
       "AppData",
       "Roaming",
-      "Tistory Blog Automation",
+      "tistory-blog-auto-v01",
       "browser-profile"
     ));
   });

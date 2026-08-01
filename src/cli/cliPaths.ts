@@ -6,5 +6,5 @@ export function getCliProfilePath(
   homeDir = os.homedir()
 ): string {
   const appData = env.APPDATA ?? path.join(homeDir, "AppData", "Roaming");
-  return path.join(appData, "Tistory Blog Automation", "browser-profile");
+  return path.join(appData, "tistory-blog-auto-v01", "browser-profile");
 }

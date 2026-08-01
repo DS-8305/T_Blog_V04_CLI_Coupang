@@ -34,7 +34,7 @@ Codex prepares a UTF-8 `content.txt` and one to five generated images in a works
 ### `draft:login`
 
 - Accepts no options.
-- Uses the same `%APPDATA%/Tistory Blog Automation/browser-profile` directory as the Electron application.
+- Uses the same `%APPDATA%/tistory-blog-auto-v01/browser-profile` directory as the Electron application.
 - Launches installed Google Chrome detached with CDP bound only to `127.0.0.1:9222` and opens Tistory home.
 - If the loopback CDP endpoint is already available, does not launch a second Chrome process and reports that the dedicated Chrome is already open.
 

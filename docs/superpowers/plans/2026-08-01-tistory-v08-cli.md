@@ -14,7 +14,7 @@
 - CLI publication is always a Tistory draft; public and scheduled publication are forbidden.
 - CLI content permits only `[TITLE]`, `[H2]`, `[BOLD]`, `[HR]`, and `[IMAGE:path]` markers plus plain text.
 - `verify` and `run` require an explicit root `https://*.tistory.com` `--blog-url`.
-- The CLI shares `%APPDATA%/Tistory Blog Automation/browser-profile` with the Electron application.
+- The CLI shares `%APPDATA%/tistory-blog-auto-v01/browser-profile` with the Electron application.
 - Chrome CDP binds only to `127.0.0.1:9222`.
 - No OpenAI API call, credential storage, Naver selector, or portable-EXE CLI mode is added.
 - All production changes follow test-driven development and preserve the existing Electron behavior.
@@ -85,7 +85,7 @@ git commit -m "feat: define Tistory draft CLI arguments"
 
 ```ts
 expect(getCliProfilePath({ APPDATA: "C:\\Users\\me\\AppData\\Roaming" }, "unused"))
-  .toBe(path.join("C:\\Users\\me\\AppData\\Roaming", "Tistory Blog Automation", "browser-profile"));
+  .toBe(path.join("C:\\Users\\me\\AppData\\Roaming", "tistory-blog-auto-v01", "browser-profile"));
 expect(spawn).toHaveBeenCalledWith(chromePath, expect.arrayContaining([
   "--remote-debugging-address=127.0.0.1",
   "--remote-debugging-port=9222",
