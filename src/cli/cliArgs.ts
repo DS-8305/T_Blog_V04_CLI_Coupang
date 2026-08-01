@@ -45,7 +45,10 @@ export function parseCliArgs(argv: string[]): CliCommand {
 
   const rawMaxPosts = options.get("--max-posts");
   const maxPosts = rawMaxPosts === undefined ? undefined : Number(rawMaxPosts);
-  if (maxPosts !== undefined && (!Number.isInteger(maxPosts) || maxPosts <= 0)) {
+  if (rawMaxPosts !== undefined && !/^[1-9]\d*$/.test(rawMaxPosts)) {
+    throw new Error("--max-posts must be a positive integer");
+  }
+  if (maxPosts !== undefined && !Number.isSafeInteger(maxPosts)) {
     throw new Error("--max-posts must be a positive integer");
   }
 

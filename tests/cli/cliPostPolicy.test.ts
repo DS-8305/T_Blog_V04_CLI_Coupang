@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { applyCliDraftPolicy } from "../../src/cli/cliPostPolicy";
+import { loadPosts } from "../../src/core/postLoader";
 import type { PostJob, PostStatus } from "../../src/shared/types";
 
 describe("applyCliDraftPolicy", () => {
@@ -54,6 +55,34 @@ describe("applyCliDraftPolicy", () => {
       cliMarkerError("SCHEDULE"),
       cliMarkerError("QUOTE")
     ]);
+  });
+
+  it("rejects marker-looking syntax outside the exact five-marker allowlist", async () => {
+    const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "tistory-cli-allowlist-"));
+    const postFolder = path.join(workspace, "001-invalid-markers");
+    await fs.mkdir(postFolder, { recursive: true });
+    await fs.writeFile(path.join(postFolder, "content.txt"), [
+      "[TITLE]A[/TITLE]",
+      "[H3]Not allowed[/H3]",
+      "[ H4]Also not allowed[/ H4]",
+      "[IMAGE :images/a.png]"
+    ].join("\n"), "utf8");
+
+    const [result] = await applyCliDraftPolicy(await loadPosts(workspace));
+
+    expect(result.status).toBe("validation_error");
+    expect(result.parsed.errors).toEqual(expect.arrayContaining([
+      cliMarkerError("H3"),
+      cliMarkerError("H4"),
+      cliMarkerError("IMAGE")
+    ]));
+  });
+
+  it("fails closed when the source content cannot be reread", async () => {
+    const job = await createJob("[TITLE]A[/TITLE]\nBody");
+    await fs.rm(job.contentPath);
+
+    await expect(applyCliDraftPolicy([job])).rejects.toThrow();
   });
 
   it("preserves existing parser errors without mutating the original job", async () => {

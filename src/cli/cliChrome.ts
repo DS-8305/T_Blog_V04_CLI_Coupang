@@ -6,7 +6,11 @@ import {
   TISTORY_HOME_URL
 } from "../main/ManualChromeLoginLauncher";
 
-type DetachedChild = { unref(): void };
+type DetachedChild = {
+  unref(): void;
+  once(event: "spawn", listener: () => void): DetachedChild;
+  once(event: "error", listener: (error: Error) => void): DetachedChild;
+};
 type Spawn = (executable: string, args: string[], options: SpawnOptions) => DetachedChild;
 
 type LaunchDependencies = {
@@ -46,6 +50,14 @@ export async function launchCliChrome(
     "--no-default-browser-check",
     TISTORY_HOME_URL
   ], { detached: true, stdio: "ignore", windowsHide: false });
+  await waitForSpawn(child);
   child.unref();
   return "launched";
+}
+
+function waitForSpawn(child: DetachedChild): Promise<void> {
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("spawn", resolve);
+  });
 }

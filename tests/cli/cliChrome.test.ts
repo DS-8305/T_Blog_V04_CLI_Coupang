@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { EventEmitter } from "node:events";
 import path from "node:path";
 import { getCliProfilePath } from "../../src/cli/cliPaths";
 import { isCdpAvailable, launchCliChrome } from "../../src/cli/cliChrome";
@@ -55,7 +56,11 @@ describe("Tistory CLI Chrome", () => {
 
   it("launches Chrome detached with the shared profile and loopback CDP", async () => {
     const unref = vi.fn();
-    const spawn = vi.fn(() => ({ unref }));
+    const child = Object.assign(new EventEmitter(), { unref });
+    const spawn = vi.fn(() => {
+      queueMicrotask(() => child.emit("spawn"));
+      return child;
+    });
 
     await expect(launchCliChrome("C:\\shared profile", {
       isCdpAvailable: vi.fn(async () => false),
@@ -76,5 +81,22 @@ describe("Tistory CLI Chrome", () => {
       { detached: true, stdio: "ignore", windowsHide: false }
     );
     expect(unref).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an asynchronous Chrome spawn error without reporting launched", async () => {
+    const unref = vi.fn();
+    const child = Object.assign(new EventEmitter(), { unref });
+    const spawn = vi.fn(() => {
+      queueMicrotask(() => child.emit("error", new Error("spawn failed")));
+      return child;
+    });
+
+    await expect(launchCliChrome("C:\\profile", {
+      isCdpAvailable: vi.fn(async () => false),
+      findChrome: vi.fn(async () => "C:\\missing\\chrome.exe"),
+      spawn
+    })).rejects.toThrow("spawn failed");
+
+    expect(unref).not.toHaveBeenCalled();
   });
 });

@@ -66,7 +66,9 @@ describe("parseCliArgs", () => {
   it.each([
     ["--speed", "instant", "--speed must be fast, normal, or slow"],
     ["--max-posts", "0", "--max-posts must be a positive integer"],
-    ["--max-posts", "1.5", "--max-posts must be a positive integer"]
+    ["--max-posts", "1.5", "--max-posts must be a positive integer"],
+    ["--max-posts", "1e2", "--max-posts must be a positive integer"],
+    ["--max-posts", "0x10", "--max-posts must be a positive integer"]
   ])("rejects invalid run option %s %s", (key, value, message) => {
     expect(() => parseCliArgs([
       "run",
