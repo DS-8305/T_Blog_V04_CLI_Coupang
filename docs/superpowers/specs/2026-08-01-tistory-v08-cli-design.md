@@ -111,7 +111,7 @@ Add `docs/tistory-v08-cli-workflow.md` with command examples, workspace layout, 
 - CLI runner tests for login, verification failure, validation failure before editor input, successful delegation, and cleanup.
 - Existing Electron, parser, loader, orchestration, and Tistory automation tests must continue to pass.
 - Run the full test suite, TypeScript/build pipeline, CLI build, and `git diff --check`.
-- Package a fresh portable executable only after all changes pass, even though the portable app does not expose the new CLI commands.
+- Do not rebuild the portable executable for this source-only CLI change.
 
 ## Non-Goals
 

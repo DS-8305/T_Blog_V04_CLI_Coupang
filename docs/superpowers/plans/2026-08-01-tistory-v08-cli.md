@@ -266,14 +266,13 @@ git add -- prompts/tistory-blog-content-template.md docs/tistory-v08-cli-workflo
 git commit -m "docs: add Tistory Codex CLI workflow"
 ```
 
-### Task 6: Full verification and portable package
+### Task 6: Full verification
 
 **Files:**
 - Verify all modified files.
-- Generate: `release/Tistory-Blog-Automation-0.1.0-portable.exe`
 
 **Interfaces:**
-- Confirms the feature is compatible with the entire application and produces the normal portable deliverable.
+- Confirms the feature is compatible with the entire application and that the source-based CLI commands enforce their validation boundary.
 
 - [ ] **Step 1: Run fresh full verification**
 
@@ -293,16 +292,10 @@ Run: `git status -sb`, `git log --oneline -8`, and `git diff origin/main...HEAD 
 
 Expected: only approved CLI, prompt, documentation, tests, and design/plan changes are present.
 
-- [ ] **Step 3: Confirm the portable app is not running**
+- [ ] **Step 3: Smoke-test pnpm argument forwarding without browser input**
 
-Check Windows processes for `Tistory Blog Automation` and `Tistory-Blog-Automation-0.1.0-portable`. If running, wait for it to exit before packaging; do not terminate it automatically.
+Run `draft:verify` with a non-Tistory URL and `draft:run` with a relative workspace. Both commands must receive the options after pnpm forwarding, reject them with exit code `1`, and stop before browser attachment.
 
-- [ ] **Step 4: Build and inspect the portable executable**
+- [ ] **Step 4: Final report**
 
-Run: `pnpm run dist:portable`, then inspect file length, modification time, and SHA-256 with `Get-Item` and `Get-FileHash`.
-
-Expected: electron-builder exits `0` and a fresh portable executable exists.
-
-- [ ] **Step 5: Final verification commit if required**
-
-If verification itself produced no source changes, do not create an empty commit. Report branch, commit list, test count, build result, portable path/hash, and that no GitHub push occurred unless explicitly requested.
+If verification itself produced no source changes, do not create an empty commit. Report branch, commit list, test count, build result, CLI smoke-test result, and that no portable package or GitHub push occurred.
