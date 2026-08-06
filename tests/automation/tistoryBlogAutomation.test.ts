@@ -113,7 +113,9 @@ describe("TistoryBlogAutomation editor events", () => {
       `press-on:${tistorySelectors.body[0]}:Control+End`,
       `click:${tistorySelectors.formatMenu[0]}`,
       `click:${tistorySelectors.heading1[0]}`,
+      "press:Control+B",
       "type:첫 소제목",
+      "press:Control+B",
       "press:Enter"
     ]);
   });

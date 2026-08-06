@@ -118,7 +118,9 @@ export class TistoryBlogAutomation implements AutomationEngine {
     } else if (event.type === "typeHeading1") {
       await (await this.firstVisible(page, tistorySelectors.formatMenu)).click();
       await (await this.firstVisible(page, tistorySelectors.heading1)).click();
+      await page.keyboard.press("Control+B");
       await page.keyboard.type(event.text, { delay: speed.keyDelayMs });
+      await page.keyboard.press("Control+B");
       await page.keyboard.press("Enter");
     } else if (event.type === "typeBold") {
       await page.keyboard.press("Control+B");
