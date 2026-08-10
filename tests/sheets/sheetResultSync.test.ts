@@ -7,6 +7,7 @@ import { syncCompletedSheetPosts } from "../../src/sheets/sheetResultSync";
 import { writeSheetSource, type SheetSource } from "../../src/sheets/sheetSource";
 import { readPostStatus, writePostStatus } from "../../src/core/statusStore";
 import type { PostStatus } from "../../src/shared/types";
+import { readSheetCompletionCheckpoint } from "../../src/sheets/sheetCompletionCheckpoint";
 
 const temporaryRoots: string[] = [];
 
@@ -30,6 +31,8 @@ describe("syncCompletedSheetPosts", () => {
       source.rowNumber,
       2
     );
+    await expect(readSheetCompletionCheckpoint(path.join(workspace, "posts", "000034-keyword")))
+      .resolves.toMatchObject({ state: "sheet_done", rowNumber: 34 });
   });
 
   it("treats an existing DONE value as synchronized", async () => {
@@ -86,6 +89,22 @@ describe("syncCompletedSheetPosts", () => {
 
     await expect(syncCompletedSheetPosts(workspace, client)).rejects.toThrow("offline");
     await expect(readPostStatus(postFolder)).resolves.toMatchObject({ status: "draft_saved" });
+    await expect(readSheetCompletionCheckpoint(postFolder))
+      .resolves.toMatchObject({ state: "awaiting_sheet_done", rowNumber: 34 });
+  });
+
+  it("does not finish synchronization when done cannot be read back", async () => {
+    const { workspace, postFolder, source } = await createLinkedPost("draft_saved");
+    const client = fakeClient(
+      { keyword: source.keyword, result: "", keywordColumn: 1, resultColumn: 2 },
+      undefined,
+      { keyword: source.keyword, result: "", keywordColumn: 1, resultColumn: 2 }
+    );
+
+    await expect(syncCompletedSheetPosts(workspace, client))
+      .rejects.toThrow("Sheet row 34 did not confirm done after write");
+    await expect(readSheetCompletionCheckpoint(postFolder))
+      .resolves.toMatchObject({ state: "awaiting_sheet_done", rowNumber: 34 });
   });
 });
 
@@ -107,13 +126,14 @@ async function createLinkedPost(status: PostStatus) {
   return { workspace, postFolder, source };
 }
 
-function fakeClient(row: SheetSourceRow, writeError?: Error): GoogleSheetsClient & {
+function fakeClient(row: SheetSourceRow, writeError?: Error, rowAfterWrite: SheetSourceRow = { ...row, result: "done" }): GoogleSheetsClient & {
   readSourceRow: ReturnType<typeof vi.fn>;
   writeDone: ReturnType<typeof vi.fn>;
 } {
+  let readCount = 0;
   return {
     readQueue: vi.fn(async () => ({ values: [], rowCount: 0 })),
-    readSourceRow: vi.fn(async () => row),
+    readSourceRow: vi.fn(async () => readCount++ === 0 ? row : rowAfterWrite),
     writeDone: vi.fn(async () => {
       if (writeError) throw writeError;
     })

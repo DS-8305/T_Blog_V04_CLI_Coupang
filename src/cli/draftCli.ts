@@ -83,7 +83,13 @@ export async function main(
       });
       if (result.stopped) throw new Error(result.message);
       if (sheetsClient) {
-        await syncSheets(command.workspacePath, sheetsClient, log);
+        const sheetSummary = await syncSheets(command.workspacePath, sheetsClient, log);
+        const pending = sheetSummary.pending[0];
+        if (pending) {
+          throw new Error(
+            `Sheet completion pending for row ${pending.source.rowNumber}; retry this command to resume the done write.`
+          );
+        }
       }
       log(result.message);
       return 0;

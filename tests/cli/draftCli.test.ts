@@ -207,6 +207,31 @@ describe("Tistory draft CLI", () => {
     expect(errors).toEqual(["Sheets offline"]);
   });
 
+  it("returns a failure while linked Sheet completion remains pending", async () => {
+    const errors: string[] = [];
+    const pendingJob = createJob("pending");
+    const source = linkedSource();
+    const syncCompleted = vi.fn()
+      .mockResolvedValueOnce({ synced: 0, alreadyDone: 0, pending: [source] })
+      .mockResolvedValueOnce({ synced: 0, alreadyDone: 0, pending: [source] });
+
+    const code = await main(runArgs(), {
+      findSheetSources: vi.fn(async () => [source]),
+      createSheetsClient,
+      syncCompletedSheetPosts: syncCompleted,
+      loadPosts: vi.fn(async () => [pendingJob]),
+      applyPolicy: vi.fn(async () => [pendingJob]),
+      attachAutomation: () => createAutomation({ ok: true }),
+      runPosts: vi.fn(async () => ({ stopped: false, message: "complete" })),
+      error: (message) => errors.push(message)
+    });
+
+    expect(code).toBe(1);
+    expect(errors).toEqual([
+      "Sheet completion pending for row 2; retry this command to resume the done write."
+    ]);
+  });
+
   it("returns a failure when the orchestrator stops", async () => {
     const errors: string[] = [];
     const pendingJob = createJob("pending");

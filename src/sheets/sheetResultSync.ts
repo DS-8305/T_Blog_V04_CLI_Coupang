@@ -1,6 +1,7 @@
 import { readPostStatus } from "../core/statusStore";
 import type { GoogleSheetsClient } from "./googleSheetsClient";
 import { findSheetSources, type LinkedSheetSource } from "./sheetSource";
+import { writeSheetCompletionCheckpoint } from "./sheetCompletionCheckpoint";
 
 export type SheetSyncSummary = {
   synced: number;
@@ -24,6 +25,12 @@ export async function syncCompletedSheetPosts(
     }
 
     const { source } = item;
+    await writeSheetCompletionCheckpoint(item.postFolder, {
+      version: 1,
+      state: "awaiting_sheet_done",
+      updatedAt: new Date().toISOString(),
+      rowNumber: source.rowNumber
+    });
     const remote = await client.readSourceRow(
       source.spreadsheetId,
       source.sheetName,
@@ -35,6 +42,12 @@ export async function syncCompletedSheetPosts(
 
     const result = remote.result.trim();
     if (result.toLowerCase() === "done") {
+      await writeSheetCompletionCheckpoint(item.postFolder, {
+        version: 1,
+        state: "sheet_done",
+        updatedAt: new Date().toISOString(),
+        rowNumber: source.rowNumber
+      });
       summary.alreadyDone += 1;
       onLog?.(`Sheet row ${source.rowNumber} is already done.`);
       continue;
@@ -49,6 +62,20 @@ export async function syncCompletedSheetPosts(
       source.rowNumber,
       remote.resultColumn
     );
+    const verified = await client.readSourceRow(
+      source.spreadsheetId,
+      source.sheetName,
+      source.rowNumber
+    );
+    if (verified.result.trim().toLowerCase() !== "done") {
+      throw new Error(`Sheet row ${source.rowNumber} did not confirm done after write`);
+    }
+    await writeSheetCompletionCheckpoint(item.postFolder, {
+      version: 1,
+      state: "sheet_done",
+      updatedAt: new Date().toISOString(),
+      rowNumber: source.rowNumber
+    });
     summary.synced += 1;
     onLog?.(`Sheet row ${source.rowNumber} marked done.`);
   }
