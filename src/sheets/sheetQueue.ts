@@ -5,10 +5,14 @@ export type PendingSheetRow = {
   resultColumn: number;
 };
 
+export type SheetHeaderColumns = {
+  keywordColumn: number;
+  resultColumn: number;
+};
+
 export function selectFirstPendingRow(values: string[][]): PendingSheetRow | null {
   const headers = values[0] ?? [];
-  const keywordColumn = requireUniqueHeader(headers, "keyword");
-  const resultColumn = requireUniqueHeader(headers, "result");
+  const { keywordColumn, resultColumn } = resolveSheetHeaders(headers);
 
   for (let index = 1; index < values.length; index += 1) {
     const keyword = values[index]?.[keywordColumn - 1]?.trim() ?? "";
@@ -19,6 +23,13 @@ export function selectFirstPendingRow(values: string[][]): PendingSheetRow | nul
   }
 
   return null;
+}
+
+export function resolveSheetHeaders(headers: string[]): SheetHeaderColumns {
+  return {
+    keywordColumn: requireUniqueHeader(headers, "keyword"),
+    resultColumn: requireUniqueHeader(headers, "result")
+  };
 }
 
 function requireUniqueHeader(headers: string[], expected: string): number {
