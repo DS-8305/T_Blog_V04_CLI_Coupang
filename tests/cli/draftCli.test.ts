@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { main } from "../../src/cli/draftCli";
 import type { AutomationEngine } from "../../src/automation/AutomationEngine";
 import type { PostJob, SessionVerificationResult } from "../../src/shared/types";
+import type { GoogleSheetsClient } from "../../src/sheets/googleSheetsClient";
+import type { LinkedSheetSource } from "../../src/sheets/sheetSource";
 
 describe("Tistory draft CLI", () => {
   it.each([
@@ -126,6 +128,85 @@ describe("Tistory draft CLI", () => {
     expect(automation.close).toHaveBeenCalledOnce();
   });
 
+  it("does not create a Sheets client for a workspace without linked manifests", async () => {
+    const createSheetsClient = vi.fn();
+    const pendingJob = createJob("pending");
+
+    const code = await main(runArgs(), {
+      findSheetSources: vi.fn(async () => []),
+      createSheetsClient,
+      loadPosts: vi.fn(async () => [pendingJob]),
+      applyPolicy: vi.fn(async () => [pendingJob]),
+      attachAutomation: () => createAutomation({ ok: true }),
+      runPosts: vi.fn(async () => ({ stopped: false, message: "complete" }))
+    });
+
+    expect(code).toBe(0);
+    expect(createSheetsClient).not.toHaveBeenCalled();
+  });
+
+  it("syncs a linked Sheet workspace before and after a successful run", async () => {
+    const pendingJob = createJob("pending");
+    const syncCompleted = vi.fn()
+      .mockResolvedValueOnce({ synced: 0, alreadyDone: 0, pending: [linkedSource()] })
+      .mockResolvedValueOnce({ synced: 1, alreadyDone: 0, pending: [] });
+    const client = createSheetsClient();
+
+    const code = await main(runArgs(), {
+      findSheetSources: vi.fn(async () => [linkedSource()]),
+      createSheetsClient: () => client,
+      syncCompletedSheetPosts: syncCompleted,
+      loadPosts: vi.fn(async () => [pendingJob]),
+      applyPolicy: vi.fn(async () => [pendingJob]),
+      attachAutomation: () => createAutomation({ ok: true }),
+      runPosts: vi.fn(async () => ({ stopped: false, message: "complete" }))
+    });
+
+    expect(code).toBe(0);
+    expect(syncCompleted).toHaveBeenNthCalledWith(1, "C:\\blog-workspace", client, expect.any(Function));
+    expect(syncCompleted).toHaveBeenNthCalledWith(2, "C:\\blog-workspace", client, expect.any(Function));
+  });
+
+  it("does not post-sync a linked workspace after the orchestrator stops", async () => {
+    const pendingJob = createJob("pending");
+    const syncCompleted = vi.fn(async () => ({ synced: 0, alreadyDone: 0, pending: [linkedSource()] }));
+
+    const code = await main(runArgs(), {
+      findSheetSources: vi.fn(async () => [linkedSource()]),
+      createSheetsClient,
+      syncCompletedSheetPosts: syncCompleted,
+      loadPosts: vi.fn(async () => [pendingJob]),
+      applyPolicy: vi.fn(async () => [pendingJob]),
+      attachAutomation: () => createAutomation({ ok: true }),
+      runPosts: vi.fn(async () => ({ stopped: true, reason: "needs_review" as const, message: "Review it." }))
+    });
+
+    expect(code).toBe(1);
+    expect(syncCompleted).toHaveBeenCalledOnce();
+  });
+
+  it("reports a post-run Sheet sync failure for retry on the next invocation", async () => {
+    const errors: string[] = [];
+    const pendingJob = createJob("pending");
+    const syncCompleted = vi.fn()
+      .mockResolvedValueOnce({ synced: 0, alreadyDone: 0, pending: [linkedSource()] })
+      .mockRejectedValueOnce(new Error("Sheets offline"));
+
+    const code = await main(runArgs(), {
+      findSheetSources: vi.fn(async () => [linkedSource()]),
+      createSheetsClient,
+      syncCompletedSheetPosts: syncCompleted,
+      loadPosts: vi.fn(async () => [pendingJob]),
+      applyPolicy: vi.fn(async () => [pendingJob]),
+      attachAutomation: () => createAutomation({ ok: true }),
+      runPosts: vi.fn(async () => ({ stopped: false, message: "complete" })),
+      error: (message) => errors.push(message)
+    });
+
+    expect(code).toBe(1);
+    expect(errors).toEqual(["Sheets offline"]);
+  });
+
   it("returns a failure when the orchestrator stops", async () => {
     const errors: string[] = [];
     const pendingJob = createJob("pending");
@@ -187,6 +268,29 @@ function createJob(
       },
       events: [{ type: "setTitle", text: "A" }],
       errors
+    }
+  };
+}
+
+function createSheetsClient(): GoogleSheetsClient {
+  return {
+    readQueue: vi.fn(async () => ({ values: [], rowCount: 0 })),
+    readSourceRow: vi.fn(async () => ({ keyword: "keyword", result: "", keywordColumn: 1, resultColumn: 2 })),
+    writeDone: vi.fn(async () => undefined)
+  };
+}
+
+function linkedSource(): LinkedSheetSource {
+  return {
+    postFolder: "C:\\blog-workspace\\posts\\000002-keyword",
+    source: {
+      version: 1,
+      spreadsheetId: "spreadsheet-id",
+      sheetName: "시트1",
+      rowNumber: 2,
+      keywordHeader: "keyword",
+      resultHeader: "result",
+      keyword: "keyword"
     }
   };
 }

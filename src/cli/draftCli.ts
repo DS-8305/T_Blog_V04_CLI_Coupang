@@ -8,6 +8,9 @@ import { parseCliArgs } from "./cliArgs";
 import { launchCliChrome } from "./cliChrome";
 import { getCliProfilePath } from "./cliPaths";
 import { applyCliDraftPolicy } from "./cliPostPolicy";
+import { createGoogleSheetsClient, type GoogleSheetsClient } from "../sheets/googleSheetsClient";
+import { syncCompletedSheetPosts } from "../sheets/sheetResultSync";
+import { findSheetSources } from "../sheets/sheetSource";
 
 export type CliDependencies = {
   getProfilePath: typeof getCliProfilePath;
@@ -16,6 +19,9 @@ export type CliDependencies = {
   applyPolicy: typeof applyCliDraftPolicy;
   attachAutomation: (endpoint: string, blogUrl: string) => AutomationEngine;
   runPosts: typeof runPosts;
+  findSheetSources: typeof findSheetSources;
+  createSheetsClient: typeof createGoogleSheetsClient;
+  syncCompletedSheetPosts: typeof syncCompletedSheetPosts;
   log: (message: string) => void;
   error: (message: string) => void;
 };
@@ -31,6 +37,9 @@ export async function main(
   const attachAutomation = overrides.attachAutomation
     ?? ((endpoint, blogUrl) => TistoryBlogAutomation.attach(endpoint, blogUrl));
   const run = overrides.runPosts ?? runPosts;
+  const findSources = overrides.findSheetSources ?? findSheetSources;
+  const createSheetsClient = overrides.createSheetsClient ?? createGoogleSheetsClient;
+  const syncSheets = overrides.syncCompletedSheetPosts ?? syncCompletedSheetPosts;
   const log = overrides.log ?? console.log;
   const logError = overrides.error ?? console.error;
 
@@ -45,7 +54,13 @@ export async function main(
     }
 
     let jobs: PostJob[] | undefined;
+    let sheetsClient: GoogleSheetsClient | undefined;
     if (command.command === "run") {
+      const linkedSources = await findSources(command.workspacePath);
+      if (linkedSources.length > 0) {
+        sheetsClient = createSheetsClient();
+        await syncSheets(command.workspacePath, sheetsClient, log);
+      }
       jobs = await applyPolicy(await load(command.workspacePath));
       assertJobsRunnable(jobs);
     }
@@ -67,6 +82,9 @@ export async function main(
         onLog: log
       });
       if (result.stopped) throw new Error(result.message);
+      if (sheetsClient) {
+        await syncSheets(command.workspacePath, sheetsClient, log);
+      }
       log(result.message);
       return 0;
     } finally {
