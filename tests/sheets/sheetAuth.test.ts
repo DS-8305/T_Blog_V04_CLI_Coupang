@@ -30,4 +30,22 @@ describe("createSheetsAccessToken", () => {
     await expect(createSheetsAccessToken("C:\\secure\\service-account.json", createAuth))
       .rejects.toThrow("Google service account did not return an access token.");
   });
+
+  it("does not expose the credential path when authentication fails", async () => {
+    const secretPath = "C:\\secret\\project-private-key.json";
+    const createAuth = () => ({
+      getClient: async () => {
+        throw new Error(`ENOENT: no such file, open '${secretPath}'`);
+      }
+    });
+
+    let message = "";
+    try {
+      await createSheetsAccessToken(secretPath, createAuth);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toBe("Google Sheets service account authentication failed.");
+    expect(message).not.toContain(secretPath);
+  });
 });

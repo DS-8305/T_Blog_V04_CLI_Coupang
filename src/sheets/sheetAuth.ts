@@ -16,8 +16,13 @@ export async function createSheetsAccessToken(
     throw new Error("GOOGLE_APPLICATION_CREDENTIALS must point to a service account JSON file.");
   }
 
-  const client = await createAuth({ keyFile, scopes: [SHEETS_SCOPE] }).getClient();
-  const result = await client.getAccessToken();
+  let result: TokenResult;
+  try {
+    const client = await createAuth({ keyFile, scopes: [SHEETS_SCOPE] }).getClient();
+    result = await client.getAccessToken();
+  } catch {
+    throw new Error("Google Sheets service account authentication failed.");
+  }
   const token = typeof result === "string" ? result : result?.token;
   if (!token) throw new Error("Google service account did not return an access token.");
   return token;
