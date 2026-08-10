@@ -28,10 +28,7 @@ describe("TistoryBlogAutomation session verification", () => {
     );
 
     await expect(automation.verifySession()).resolves.toEqual({ ok: true });
-    expect(playwrightMocks.connectOverCDP).toHaveBeenCalledWith(
-      "http://127.0.0.1:9222",
-      { noDefaults: true }
-    );
+    expect(playwrightMocks.connectOverCDP).toHaveBeenCalledWith("http://127.0.0.1:9222");
     expect(harness.page.goto).toHaveBeenCalledWith(
       "https://sample.tistory.com/manage/newpost",
       { waitUntil: "domcontentloaded" }
@@ -165,8 +162,9 @@ describe("TistoryBlogAutomation session verification", () => {
 
 describe("TistoryBlogAutomation editor events", () => {
   it("uses the live TinyMCE toolbar attributes for 제목1 and divider controls", () => {
-    expect(tistorySelectors.formatMenu[0]).toBe("[aria-label='문단모양']");
-    expect(tistorySelectors.divider[0]).toBe("[aria-label='구분선']");
+    expect(tistorySelectors.formatMenu[0]).toBe("[aria-label='문단모양'] button");
+    expect(tistorySelectors.divider[0]).toBe("[aria-label='구분선'] button");
+    expect(tistorySelectors.attach[0]).toBe("#mceu_0-open");
   });
 
   it("finds the body inside Tistory's editor iframe", async () => {
@@ -193,7 +191,8 @@ describe("TistoryBlogAutomation editor events", () => {
 
     expect(actions).toEqual([
       `press-on:${tistorySelectors.body[0]}:Control+End`,
-      `click:${tistorySelectors.formatMenu[0]}:force`,
+      `dispatch:click:${tistorySelectors.formatMenu[0]}`,
+      "wait:300",
       `click:${tistorySelectors.heading1[0]}:force`,
       "press:Control+B",
       "type:첫 소제목",
@@ -209,7 +208,9 @@ describe("TistoryBlogAutomation editor events", () => {
 
     await automation.executeEvent(page as never, { type: "insertDivider" }, speed);
 
-    expect(actions).toContain("click:[role='menuitem']:has-text('구분선 style1')");
+    expect(actions).toContain("dispatch:click:[aria-label='구분선'] button");
+    expect(actions).toContain("wait:300");
+    expect(actions).toContain(`click:${tistorySelectors.dividerStyle1[0]}:force`);
   });
 
   it("opens 첨부 then 사진 and assigns the image through the file chooser once", async () => {
@@ -223,11 +224,46 @@ describe("TistoryBlogAutomation editor events", () => {
       absolutePath: "C:\\post\\images\\hero.png"
     }, speed);
 
-    expect(actions).toContain(`click:${tistorySelectors.attach[0]}`);
-    expect(actions).toContain(`click:${tistorySelectors.photoMenuItem[0]}`);
+    expect(actions).toContain(`click:${tistorySelectors.attach[0]}:force`);
+    expect(actions).toContain(`evaluate:${tistorySelectors.attach[0]}`);
+    expect(actions).toContain("wait:1500");
+    expect(actions).toContain("wait:300");
+    expect(actions).toContain(`click:${tistorySelectors.photoMenuItem[0]}:force`);
     expect(actions).toContain("choose:C:\\post\\images\\hero.png");
     expect(actions.filter((action) => action.startsWith("choose:"))).toHaveLength(1);
     expect(actions).toContain("wait:image:0");
+  });
+
+  it("waits for a dynamically rendered photo menu item", async () => {
+    const actions: string[] = [];
+    const page = createEditorPage(actions, {
+      delayedSelector: tistorySelectors.photoMenuItem[0],
+      visibleAfterCountChecks: 3
+    });
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+
+    await automation.executeEvent(page as never, {
+      type: "insertImage",
+      relativePath: "images/hero.png",
+      absolutePath: "C:\\post\\images\\hero.png"
+    }, speed);
+
+    expect(actions.filter((action) => action === "wait:100")).toHaveLength(2);
+    expect(actions).toContain("choose:C:\\post\\images\\hero.png");
+  });
+
+  it("retries the attachment button when its menu does not open", async () => {
+    const actions: string[] = [];
+    const page = createEditorPage(actions, { photoVisibleAfterAttachClicks: 2 });
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+
+    await automation.executeEvent(page as never, {
+      type: "insertImage",
+      relativePath: "images/hero.png",
+      absolutePath: "C:\\post\\images\\hero.png"
+    }, speed);
+
+    expect(actions.filter((action) => action === `click:${tistorySelectors.attach[0]}:force`)).toHaveLength(2);
   });
 
   it("uses a visible TinyMCE attachment control when a hidden duplicate comes first", async () => {
@@ -241,8 +277,8 @@ describe("TistoryBlogAutomation editor events", () => {
       absolutePath: "C:\\post\\images\\hero.png"
     }, speed);
 
-    expect(actions).toContain("click:visible-attach");
-    expect(actions).not.toContain("click:hidden-attach");
+    expect(actions).toContain("click:visible-attach:force");
+    expect(actions).not.toContain("click:hidden-attach:force");
   });
 
   it("moves the caret after an image before entering the following body text", async () => {
@@ -278,15 +314,17 @@ function createDuplicateAttachPage(actions: string[]) {
   };
   const hiddenAttach = {
     isVisible: vi.fn(async () => false),
-    click: vi.fn(async () => { actions.push("click:hidden-attach"); })
+    evaluate: vi.fn(async () => undefined),
+    click: vi.fn(async () => { actions.push("click:hidden-attach:force"); })
   };
   const visibleAttach = {
     isVisible: vi.fn(async () => true),
-    click: vi.fn(async () => { actions.push("click:visible-attach"); })
+    evaluate: vi.fn(async () => undefined),
+    click: vi.fn(async () => { actions.push("click:visible-attach:force"); })
   };
   const photo = {
     isVisible: vi.fn(async () => true),
-    click: vi.fn(async () => { actions.push("click:photo"); })
+    click: vi.fn(async () => { actions.push("click:photo:force"); })
   };
   const collection = (items: Array<Record<string, unknown>>) => ({
     count: vi.fn(async () => items.length),
@@ -303,6 +341,7 @@ function createDuplicateAttachPage(actions: string[]) {
     waitForEvent: vi.fn(async () => ({
       setFiles: vi.fn(async (value: string) => { actions.push(`choose:${value}`); })
     })),
+    waitForTimeout: vi.fn(async () => {}),
     keyboard: { press: vi.fn(), type: vi.fn() }
   };
 }
@@ -326,17 +365,22 @@ describe("TistoryBlogAutomation finalization", () => {
       status: "draft_saved",
       postUrl: "https://sample.tistory.com/manage/newpost"
     });
+    expect(page.getLastClickOptions()).toEqual({ force: true });
   });
 });
 
 function createDraftFinalizationPage() {
   let draftCount = 0;
+  let lastClickOptions: { force?: boolean } | undefined;
   const locatorFor = (selector: string) => ({
     first: () => locatorFor(selector),
     nth: () => locatorFor(selector),
     count: vi.fn(async () => selector === tistorySelectors.draftButton[0] ? 1 : 0),
     isVisible: vi.fn(async () => selector === tistorySelectors.draftButton[0]),
-    click: vi.fn(async () => { if (selector === tistorySelectors.draftButton[0]) draftCount += 1; }),
+    click: vi.fn(async (options?: { force?: boolean }) => {
+      lastClickOptions = options;
+      if (selector === tistorySelectors.draftButton[0]) draftCount += 1;
+    }),
     getAttribute: vi.fn(async () => null),
     innerText: vi.fn(async () => String(draftCount))
   });
@@ -344,7 +388,8 @@ function createDraftFinalizationPage() {
     locator: vi.fn((selector: string) => locatorFor(selector)),
     waitForURL: vi.fn(async () => { throw new Error("No navigation for draft save"); }),
     waitForTimeout: vi.fn(async () => undefined),
-    url: vi.fn(() => "https://sample.tistory.com/manage/newpost")
+    url: vi.fn(() => "https://sample.tistory.com/manage/newpost"),
+    getLastClickOptions: () => lastClickOptions
   };
 }
 
@@ -371,7 +416,13 @@ function createIframeEditorPage(actions: string[]) {
   };
 }
 
-function createEditorPage(actions: string[]) {
+function createEditorPage(actions: string[], options: {
+  delayedSelector?: string;
+  visibleAfterCountChecks?: number;
+  photoVisibleAfterAttachClicks?: number;
+} = {}) {
+  let delayedCountChecks = 0;
+  let attachClicks = 0;
   const visible = new Set<string>([
     tistorySelectors.title[0],
     tistorySelectors.body[0],
@@ -385,11 +436,25 @@ function createEditorPage(actions: string[]) {
   const makeLocator = (selector: string) => ({
     first: () => makeLocator(selector),
     nth: () => makeLocator(selector),
-    isVisible: vi.fn(async () => visible.has(selector)),
-    count: vi.fn(async () => visible.has(selector) ? 1 : 0),
+    isVisible: vi.fn(async () => {
+      if (selector === tistorySelectors.photoMenuItem[0] && options.photoVisibleAfterAttachClicks) {
+        return attachClicks >= options.photoVisibleAfterAttachClicks;
+      }
+      return visible.has(selector);
+    }),
+    count: vi.fn(async () => {
+      if (selector === options.delayedSelector) {
+        delayedCountChecks += 1;
+        return delayedCountChecks >= (options.visibleAfterCountChecks ?? 1) ? 1 : 0;
+      }
+      return visible.has(selector) ? 1 : 0;
+    }),
     click: vi.fn(async (options?: { force?: boolean }) => {
+      if (selector === tistorySelectors.attach[0]) attachClicks += 1;
       actions.push(`click:${selector}${options?.force ? ":force" : ""}`);
     }),
+    evaluate: vi.fn(async () => { actions.push(`evaluate:${selector}`); }),
+    dispatchEvent: vi.fn(async (event: string) => { actions.push(`dispatch:${event}:${selector}`); }),
     press: vi.fn(async (key: string) => { actions.push(`press-on:${selector}:${key}`); }),
     fill: vi.fn(async (value: string) => { actions.push(`fill:${selector}:${value}`); }),
     setInputFiles: vi.fn(async (value: string) => { actions.push(`upload:${value}`); }),
@@ -402,6 +467,7 @@ function createEditorPage(actions: string[]) {
   });
   return {
     locator: vi.fn((selector: string) => makeLocator(selector)),
+    waitForTimeout: vi.fn(async (milliseconds: number) => { actions.push(`wait:${milliseconds}`); }),
     frameLocator: vi.fn(() => ({
       locator: vi.fn(() => makeLocator("missing-iframe-body"))
     })),

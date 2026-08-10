@@ -22,14 +22,14 @@ export const tistorySelectors = {
   ],
   title: ["textarea#post-title-inp", "textarea[placeholder*='제목']"],
   body: [".mce-content-body[contenteditable='true']", "div[contenteditable='true'][role='textbox']"],
-  formatMenu: ["[aria-label='문단모양']", ".mce-menubtn[aria-haspopup='true']"],
+  formatMenu: ["[aria-label='문단모양'] button", ".mce-menubtn[aria-haspopup='true'] button"],
   heading1: ["[role='menuitem']:has-text('제목1')", "button:has-text('제목1')", "span:has-text('제목1')"],
-  divider: ["[aria-label='구분선']"],
+  divider: ["[aria-label='구분선'] button"],
   dividerStyle1: [
     "[role='menuitem']:has-text('구분선 style1')",
     ".mce-hr:has(.mce-i-hr-style1)"
   ],
-  attach: ["[aria-label='첨부']"],
+  attach: ["#mceu_0-open", "[aria-label='첨부'] button"],
   photoMenuItem: ["[role='menuitem']:has-text('사진')"],
   categoryButton: ["button:has-text('카테고리')", "button[aria-label*='카테고리']"],
   tagInput: ["input[placeholder*='태그']", "input[aria-label*='태그']"],

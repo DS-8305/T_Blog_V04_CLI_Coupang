@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
 import type { AutomationEngine, AutomationResult, AutomationRunOptions } from "./AutomationEngine";
 import type { EditorEvent, PostJob, SessionVerificationResult, TypingSpeedProfile } from "../shared/types";
 import { getTypingSpeedProfile } from "../core/typingSpeed";
@@ -123,7 +123,8 @@ export class TistoryBlogAutomation implements AutomationEngine {
       await page.keyboard.press("Enter");
       await page.keyboard.press("Enter");
     } else if (event.type === "typeHeading1") {
-      await (await this.firstVisible(page, tistorySelectors.formatMenu)).click({ force: true });
+      await (await this.firstVisible(page, tistorySelectors.formatMenu)).dispatchEvent("click");
+      await page.waitForTimeout(300);
       await (await this.firstVisible(page, tistorySelectors.heading1)).click({ force: true });
       await page.keyboard.press("Control+B");
       await page.keyboard.type(event.text, { delay: speed.keyDelayMs });
@@ -135,15 +136,36 @@ export class TistoryBlogAutomation implements AutomationEngine {
       await page.keyboard.press("Control+B");
       await page.keyboard.press("Enter");
     } else if (event.type === "insertDivider") {
-      await (await this.firstVisible(page, tistorySelectors.divider)).click();
-      await (await this.firstVisible(page, tistorySelectors.dividerStyle1)).click();
+      await (await this.firstVisible(page, tistorySelectors.divider)).dispatchEvent("click");
+      await page.waitForTimeout(300);
+      await (await this.firstVisible(page, tistorySelectors.dividerStyle1)).click({ force: true });
       await body.press("Control+End");
       await body.press("Enter");
     } else if (event.type === "insertImage") {
       const imagesBefore = await body.locator("img").count();
-      await (await this.firstVisible(page, tistorySelectors.attach)).click();
+      await page.waitForTimeout(1_500);
+      const attachButton = await this.firstVisible(page, tistorySelectors.attach);
+      await attachButton.evaluate((element) => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+      });
+      let photoMenuItem: Locator | null = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await attachButton.click({ force: true });
+        await page.waitForTimeout(300);
+        try {
+          photoMenuItem = await this.firstVisible(page, tistorySelectors.photoMenuItem, 500);
+          break;
+        } catch {
+          // Tistory occasionally ignores a click while its sticky toolbar is moving.
+        }
+        if (attempt < 2) await page.waitForTimeout(500);
+      }
+      if (!photoMenuItem) {
+        throw new Error(`Tistory control not found: ${tistorySelectors.photoMenuItem.join(" | ")}`);
+      }
       const chooserPromise = page.waitForEvent("filechooser");
-      await (await this.firstVisible(page, tistorySelectors.photoMenuItem)).click();
+      await photoMenuItem.click({ force: true });
       const chooser = await chooserPromise;
       await chooser.setFiles(event.absolutePath);
       await body.locator("img").nth(imagesBefore).waitFor({ state: "visible", timeout: 30_000 });
@@ -186,7 +208,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
     }
 
     const button = await this.firstVisible(page, publication === "draft" ? finalSelector : tistorySelectors.finalPublishButton);
-    await button.click();
+    await button.click({ force: true });
     try {
       await this.waitForFinalConfirmation(page, urlBefore, draftCountBefore, 8_000);
       const postUrl = page.url();
@@ -211,7 +233,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
 
   private async getPage(): Promise<Page> {
     if (!this.browser) {
-      this.browser = await chromium.connectOverCDP(this.cdpEndpoint, { noDefaults: true });
+      this.browser = await chromium.connectOverCDP(this.cdpEndpoint);
       this.context = this.browser.contexts()[0] ?? null;
     }
     if (!this.context) throw new Error("The dedicated Chrome context is unavailable.");
@@ -246,14 +268,19 @@ export class TistoryBlogAutomation implements AutomationEngine {
   }
 
   private async firstVisible(page: Page, selectors: readonly string[], timeout = 3_000) {
-    for (const selector of selectors) {
-      const matches = page.locator(selector);
-      const count = await matches.count().catch(() => 0);
-      for (let index = 0; index < count; index += 1) {
-        const locator = matches.nth(index);
-        if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+    const deadline = Date.now() + timeout;
+    do {
+      for (const selector of selectors) {
+        const matches = page.locator(selector);
+        const count = await matches.count().catch(() => 0);
+        for (let index = 0; index < count; index += 1) {
+          const locator = matches.nth(index);
+          if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+        }
       }
-    }
+      if (Date.now() >= deadline) break;
+      await page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
+    } while (Date.now() < deadline);
     throw new Error(`Tistory control not found: ${selectors.join(" | ")}`);
   }
 
