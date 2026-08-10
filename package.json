@@ -15,7 +15,9 @@
     "draft:login": "pnpm run cli:build && node dist-cli/draftCli.js login",
     "draft:verify": "pnpm run cli:build && node dist-cli/draftCli.js verify",
     "draft:run": "pnpm run cli:build && node dist-cli/draftCli.js run",
-    "build": "tsc -p tsconfig.json --noEmit && pnpm run main:build && pnpm run cli:build && vite build",
+    "sheet:build": "esbuild src/cli/sheetNextCli.ts --bundle --platform=node --format=esm --outfile=dist-cli/sheetNextCli.js",
+    "sheet:next": "pnpm run sheet:build && node dist-cli/sheetNextCli.js",
+    "build": "tsc -p tsconfig.json --noEmit && pnpm run main:build && pnpm run cli:build && pnpm run sheet:build && vite build",
     "dist:portable": "pnpm run build && electron-builder --win portable --x64",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
