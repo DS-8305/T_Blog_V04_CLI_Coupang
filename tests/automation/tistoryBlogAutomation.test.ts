@@ -41,6 +41,88 @@ describe("TistoryBlogAutomation session verification", () => {
     expect(harness.browser.close).not.toHaveBeenCalled();
   });
 
+  it("reuses the editor opened by verification when saving a draft", async () => {
+    const harness = createHarness({
+      visibleSelectors: [tistorySelectors.editorReady[0], tistorySelectors.body[0]]
+    });
+    playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
+    const automation = TistoryBlogAutomation.attach(
+      "http://127.0.0.1:9222",
+      "https://sample.tistory.com"
+    );
+    vi.spyOn(automation, "finalizePost").mockResolvedValue({
+      outcome: "confirmed",
+      status: "draft_saved"
+    });
+
+    await expect(automation.verifySession()).resolves.toEqual({ ok: true });
+    await expect(automation.saveDraft({
+      id: "001-post",
+      folderPath: "C:\\post",
+      contentPath: "C:\\post\\content.txt",
+      status: "pending",
+      parsed: {
+        title: "새 글",
+        metadata: { publication: "draft", category: null, tags: [], scheduledAt: null },
+        events: [],
+        errors: []
+      }
+    }, { speed: "fast" })).resolves.toMatchObject({ outcome: "confirmed" });
+
+    expect(harness.page.goto).toHaveBeenCalledTimes(1);
+  });
+
+  it("absorbs a dialog race when another Chrome client handles beforeunload first", async () => {
+    const harness = createHarness({ visibleSelectors: [tistorySelectors.editorReady[0]] });
+    playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
+    const automation = TistoryBlogAutomation.attach(
+      "http://127.0.0.1:9222",
+      "https://sample.tistory.com"
+    );
+
+    await expect(automation.verifySession()).resolves.toEqual({ ok: true });
+    expect(harness.dialogHandlers).toHaveLength(1);
+
+    const accept = vi.fn(async () => {
+      throw new Error("No dialog is showing");
+    });
+    await expect(harness.dialogHandlers[0]({
+      type: () => "beforeunload",
+      accept,
+      dismiss: vi.fn(async () => undefined)
+    })).resolves.toBeUndefined();
+  });
+
+  it("waits for the iframe body when it appears after the title field", async () => {
+    const harness = createHarness({
+      visibleSelectors: [tistorySelectors.editorReady[0]],
+      bodyVisibleAfterChecks: 5
+    });
+    playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
+    const automation = TistoryBlogAutomation.attach(
+      "http://127.0.0.1:9222",
+      "https://sample.tistory.com"
+    );
+    vi.spyOn(automation, "finalizePost").mockResolvedValue({
+      outcome: "confirmed",
+      status: "draft_saved"
+    });
+
+    await expect(automation.verifySession()).resolves.toEqual({ ok: true });
+    await expect(automation.saveDraft({
+      id: "001-post",
+      folderPath: "C:\\post",
+      contentPath: "C:\\post\\content.txt",
+      status: "pending",
+      parsed: {
+        title: "새 글",
+        metadata: { publication: "draft", category: null, tags: [], scheduledAt: null },
+        events: [],
+        errors: []
+      }
+    }, { speed: "fast" })).resolves.toMatchObject({ outcome: "confirmed" });
+  });
+
   it("reports a Kakao login surface as a missing session", async () => {
     const harness = createHarness({
       finalUrl: "https://accounts.kakao.com/login/",
@@ -102,7 +184,7 @@ describe("TistoryBlogAutomation editor events", () => {
     ]);
   });
 
-  it("enters an H2 block through Tistory's 제목1 format control", async () => {
+  it("enters an H2 block through Tistory's moving 제목1 format control", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
     const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
@@ -111,8 +193,8 @@ describe("TistoryBlogAutomation editor events", () => {
 
     expect(actions).toEqual([
       `press-on:${tistorySelectors.body[0]}:Control+End`,
-      `click:${tistorySelectors.formatMenu[0]}`,
-      `click:${tistorySelectors.heading1[0]}`,
+      `click:${tistorySelectors.formatMenu[0]}:force`,
+      `click:${tistorySelectors.heading1[0]}:force`,
       "press:Control+B",
       "type:첫 소제목",
       "press:Control+B",
@@ -305,7 +387,9 @@ function createEditorPage(actions: string[]) {
     nth: () => makeLocator(selector),
     isVisible: vi.fn(async () => visible.has(selector)),
     count: vi.fn(async () => visible.has(selector) ? 1 : 0),
-    click: vi.fn(async () => { actions.push(`click:${selector}`); }),
+    click: vi.fn(async (options?: { force?: boolean }) => {
+      actions.push(`click:${selector}${options?.force ? ":force" : ""}`);
+    }),
     press: vi.fn(async (key: string) => { actions.push(`press-on:${selector}:${key}`); }),
     fill: vi.fn(async (value: string) => { actions.push(`fill:${selector}:${value}`); }),
     setInputFiles: vi.fn(async (value: string) => { actions.push(`upload:${value}`); }),
@@ -336,15 +420,40 @@ function createHarness(options: {
   finalUrl?: string;
   visibleSelectors?: string[];
   bodyText?: string;
+  bodyVisibleAfterChecks?: number;
 } = {}) {
   let currentUrl = "about:blank";
   const visible = new Set(options.visibleSelectors ?? []);
+  let bodyVisibilityChecks = 0;
+  const dialogHandlers: Array<(dialog: {
+    type: () => string;
+    accept: () => Promise<void>;
+    dismiss: () => Promise<void>;
+  }) => Promise<void>> = [];
   const page = {
     isClosed: vi.fn(() => false),
     url: vi.fn(() => currentUrl),
     goto: vi.fn(async (url: string) => {
       currentUrl = options.finalUrl ?? url;
     }),
+    on: vi.fn((event: string, handler: (typeof dialogHandlers)[number]) => {
+      if (event === "dialog") dialogHandlers.push(handler);
+    }),
+    frameLocator: vi.fn(() => ({
+      locator: vi.fn((selector: string) => ({
+        first: () => ({
+          isVisible: vi.fn(async () => {
+            if (tistorySelectors.body.includes(selector as never) && options.bodyVisibleAfterChecks !== undefined) {
+              bodyVisibilityChecks += 1;
+              return bodyVisibilityChecks >= options.bodyVisibleAfterChecks;
+            }
+            return visible.has(selector);
+          }),
+          press: vi.fn(async () => undefined)
+        })
+      }))
+    })),
+    waitForTimeout: vi.fn(async () => undefined),
     locator: vi.fn((selector: string) => ({
       first: () => ({
         isVisible: vi.fn(async () => visible.has(selector)),
@@ -360,5 +469,5 @@ function createHarness(options: {
     contexts: vi.fn(() => [context]),
     close: vi.fn(async () => undefined)
   };
-  return { browser, context, page };
+  return { browser, context, page, dialogHandlers };
 }

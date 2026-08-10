@@ -14,6 +14,8 @@ export class TistoryBlogAutomation implements AutomationEngine {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private sessionVerified = false;
+  private verifiedEditorReady = false;
+  private dialogManagedPages = new WeakSet<Page>();
 
   private constructor(
     private readonly cdpEndpoint: string,
@@ -26,6 +28,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
 
   async verifySession(): Promise<SessionVerificationResult> {
     this.sessionVerified = false;
+    this.verifiedEditorReady = false;
     try {
       const page = await this.getPage();
       await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
@@ -42,6 +45,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
       const classification = classifySessionEvidence(evidence);
       if (classification === "authenticated") {
         this.sessionVerified = true;
+        this.verifiedEditorReady = true;
         return { ok: true };
       }
       if (classification === "security") {
@@ -83,7 +87,10 @@ export class TistoryBlogAutomation implements AutomationEngine {
     }
     try {
       const page = await this.getPage();
-      await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
+      if (!this.verifiedEditorReady) {
+        await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
+      }
+      this.verifiedEditorReady = false;
       await this.firstEditorBody(page, 10_000);
       const speed = getTypingSpeedProfile(options.speed);
       for (const event of job.parsed.events) {
@@ -116,8 +123,8 @@ export class TistoryBlogAutomation implements AutomationEngine {
       await page.keyboard.press("Enter");
       await page.keyboard.press("Enter");
     } else if (event.type === "typeHeading1") {
-      await (await this.firstVisible(page, tistorySelectors.formatMenu)).click();
-      await (await this.firstVisible(page, tistorySelectors.heading1)).click();
+      await (await this.firstVisible(page, tistorySelectors.formatMenu)).click({ force: true });
+      await (await this.firstVisible(page, tistorySelectors.heading1)).click({ force: true });
       await page.keyboard.press("Control+B");
       await page.keyboard.type(event.text, { delay: speed.keyDelayMs });
       await page.keyboard.press("Control+B");
@@ -194,6 +201,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
 
   async close(): Promise<void> {
     this.sessionVerified = false;
+    this.verifiedEditorReady = false;
     // This Browser belongs to the manually launched Chrome process. Calling
     // Browser.close() would terminate the user's logged-in window.
     this.browser = null;
@@ -211,7 +219,21 @@ export class TistoryBlogAutomation implements AutomationEngine {
       this.page = this.context.pages().find((candidate) => !candidate.isClosed())
         ?? await this.context.newPage();
     }
+    this.manageDialogs(this.page);
     return this.page;
+  }
+
+  private manageDialogs(page: Page): void {
+    if (this.dialogManagedPages.has(page)) return;
+    this.dialogManagedPages.add(page);
+    page.on("dialog", async (dialog) => {
+      try {
+        if (dialog.type() === "beforeunload") await dialog.accept();
+        else await dialog.dismiss();
+      } catch {
+        // Another Chrome client may handle the same dialog first.
+      }
+    });
   }
 
   private async anyVisible(page: Page, selectors: readonly string[]): Promise<boolean> {
@@ -236,14 +258,25 @@ export class TistoryBlogAutomation implements AutomationEngine {
   }
 
   private async firstEditorBody(page: Page, timeout = 3_000) {
-    for (const iframeSelector of tistorySelectors.editorIframe) {
-      const frame = page.frameLocator(iframeSelector);
-      for (const bodySelector of tistorySelectors.body) {
-        const locator = frame.locator(bodySelector).first();
-        if (await locator.isVisible({ timeout: Math.min(timeout, 500) }).catch(() => false)) return locator;
+    const deadline = Date.now() + timeout;
+    do {
+      const remaining = Math.max(1, deadline - Date.now());
+      for (const iframeSelector of tistorySelectors.editorIframe) {
+        const frame = page.frameLocator(iframeSelector);
+        for (const bodySelector of tistorySelectors.body) {
+          const locator = frame.locator(bodySelector).first();
+          if (await locator.isVisible({ timeout: Math.min(remaining, 500) }).catch(() => false)) return locator;
+        }
       }
-    }
-    return this.firstVisible(page, tistorySelectors.body, timeout);
+      try {
+        return await this.firstVisible(page, tistorySelectors.body, Math.min(remaining, 500));
+      } catch {
+        // TinyMCE can appear shortly after the title field becomes ready.
+      }
+      if (Date.now() >= deadline) break;
+      await page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
+    } while (Date.now() < deadline);
+    throw new Error(`Tistory control not found: ${tistorySelectors.body.join(" | ")}`);
   }
 
   private async waitForFinalConfirmation(
