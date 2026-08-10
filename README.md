@@ -10,6 +10,26 @@ pnpm test
 pnpm run electron:dev
 ```
 
+## Google Sheets 한 행 임시저장 사이클
+
+`codex/tistory-v08-cli` 브랜치는 Google Sheets의 `keyword`/`result` 표에서 `result`가 빈 첫 행 하나를 로컬 작업 폴더로 가져올 수 있습니다. Codex가 글과 이미지를 만든 뒤 티스토리 임시저장이 확인되면 CLI가 해당 행의 `result`를 `done`으로 기록합니다.
+
+서비스 계정 JSON 키를 저장소 밖에 보관하고 환경변수를 설정합니다.
+
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\secure\tistory-sheet-service-account.json"
+```
+
+그다음 한 행씩 실행합니다.
+
+```powershell
+pnpm.cmd run sheet:next -- --workspace C:\blog-workspace --sheet-url "https://docs.google.com/spreadsheets/d/105xA7xNE-0FcvR06Tw4RruWuVgSCoZ-MaJ4Jw-QlE-g/edit"
+# Codex가 출력된 글 폴더에 content.txt와 images/를 생성
+pnpm.cmd run draft:run -- --workspace C:\blog-workspace --blog-url https://sample.tistory.com --max-posts 1
+```
+
+다음 행은 이전 행의 임시저장 및 `done` 동기화가 끝난 뒤 다시 `sheet:next`로 가져옵니다. 전체 설정과 복구 절차는 [티스토리 V08 CLI 사용법](docs/tistory-v08-cli-workflow.md)을 참고하세요.
+
 portable 실행 파일 생성:
 
 ```powershell
