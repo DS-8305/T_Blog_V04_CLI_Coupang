@@ -1,5 +1,6 @@
 import { createSheetsAccessToken } from "./sheetAuth";
-import { resolveSheetHeaders } from "./sheetQueue";
+import { optionalSheetHeader, requireUniqueHeader, resolveSheetHeaders } from "./sheetQueue";
+import { isProfileSheet, mapProfileSheetRow, type ProfileSheetRow } from './profileSheetRow';
 
 const SHEETS_API_ROOT = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -9,6 +10,8 @@ export type SheetQueueValues = {
 };
 
 export type SheetSourceRow = {
+  automationStatus?: string;
+  profile?: ProfileSheetRow;
   keyword: string;
   result: string;
   keywordColumn: number;
@@ -16,15 +19,27 @@ export type SheetSourceRow = {
 };
 
 export type GoogleSheetsClient = {
+  writeProfileFields?(spreadsheetId: string, sheetName: string, rowNumber: number,
+    fields: Record<string, string>, expected: RowIdentity): Promise<void>;
   readQueue(spreadsheetId: string, sheetName: string): Promise<SheetQueueValues>;
   readSourceRow(spreadsheetId: string, sheetName: string, rowNumber: number): Promise<SheetSourceRow>;
   writeDone(
     spreadsheetId: string,
     sheetName: string,
     rowNumber: number,
-    resultColumn: number
+    resultColumn: number,
+    expected?: RowIdentity
   ): Promise<void>;
 };
+
+export type RowIdentity = { keyword: string; personId?: string; automationStatus?: string; result?: string };
+
+export function assertRowIdentity(row: SheetSourceRow, expected: RowIdentity, rowNumber: number): void {
+  if (row.keyword.trim() !== expected.keyword.trim()) throw new Error(`Sheet keyword changed at row ${rowNumber}`);
+  if (expected.personId !== undefined && row.profile?.personId !== expected.personId) throw new Error(`Sheet personId changed at row ${rowNumber}`);
+  if (expected.automationStatus !== undefined && row.automationStatus !== expected.automationStatus) throw new Error(`Sheet automationStatus changed at row ${rowNumber}`);
+  if (expected.result !== undefined && row.result.trim() !== expected.result) throw new Error(`Sheet result changed at row ${rowNumber}`);
+}
 
 type ClientOptions = {
   fetch?: typeof globalThis.fetch;
@@ -71,6 +86,21 @@ export function createGoogleSheetsClient(options: ClientOptions = {}): GoogleShe
     return (response.values ?? []).map((row) => row.map((value) => String(value ?? "")));
   }
 
+  async function readRow(spreadsheetId: string, sheetName: string, rowNumber: number) {
+    requireDataRow(rowNumber);
+    const prefix = `${quoteSheetName(sheetName)}!`;
+    const headers = (await readValues(spreadsheetId, `${prefix}A1:Z1`))[0] ?? [];
+    const cells = (await readValues(spreadsheetId, `${prefix}A${rowNumber}:Z${rowNumber}`))[0] ?? [];
+    const { keywordColumn, resultColumn } = resolveSheetHeaders(headers);
+    const statusColumn = optionalSheetHeader(headers, '자동화상태');
+    const row: SheetSourceRow = {
+      keyword: cells[keywordColumn - 1]?.trim() ?? '', result: cells[resultColumn - 1]?.trim() ?? '', keywordColumn, resultColumn,
+      ...(statusColumn === undefined ? {} : { automationStatus: cells[statusColumn - 1]?.trim() ?? '' }),
+      ...(isProfileSheet(headers) ? { profile: mapProfileSheetRow(headers, cells) } : {})
+    };
+    return { headers, cells, row };
+  }
+
   return {
     async readQueue(spreadsheetId, sheetName) {
       const metadata = await requestJson<MetadataResponse>(
@@ -86,21 +116,40 @@ export function createGoogleSheetsClient(options: ClientOptions = {}): GoogleShe
     },
 
     async readSourceRow(spreadsheetId, sheetName, rowNumber) {
-      requireDataRow(rowNumber);
-      const prefix = `${quoteSheetName(sheetName)}!`;
-      const headers = (await readValues(spreadsheetId, `${prefix}A1:Z1`))[0] ?? [];
-      const row = (await readValues(spreadsheetId, `${prefix}A${rowNumber}:Z${rowNumber}`))[0] ?? [];
-      const { keywordColumn, resultColumn } = resolveSheetHeaders(headers);
-      return {
-        keyword: row[keywordColumn - 1]?.trim() ?? "",
-        result: row[resultColumn - 1]?.trim() ?? "",
-        keywordColumn,
-        resultColumn
-      };
+      return (await readRow(spreadsheetId, sheetName, rowNumber)).row;
     },
 
-    async writeDone(spreadsheetId, sheetName, rowNumber, resultColumn) {
+    async writeProfileFields(spreadsheetId, sheetName, rowNumber, fields, expected) {
+      const allowed = new Set(['최신정보확인일','제목','본문','태그','조사출처','GoogleDocsURL','검수메모','자동화상태']);
+      const entries = Object.entries(fields);
+      if (!entries.length || entries.some(([header, value]) => !allowed.has(header) || typeof value !== 'string')) {
+        throw new Error('Unsupported profile result fields; result is reserved for draft completion.');
+      }
+      const before = await readRow(spreadsheetId, sheetName, rowNumber);
+      assertRowIdentity(before.row, expected, rowNumber);
+      const data = entries.map(([header, value]) => ({
+        range: `${quoteSheetName(sheetName)}!${columnLetter(requireUniqueHeader(before.headers, header))}${rowNumber}`,
+        values: [[value]]
+      }));
+      const response = await requestJson<{totalUpdatedCells?: number}>(
+        `${SHEETS_API_ROOT}/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`,
+        { method: 'POST', body: JSON.stringify({ valueInputOption: 'RAW', data }) }
+      );
+      if (response.totalUpdatedCells !== entries.length) throw new Error('Google Sheets did not confirm all profile cells updated.');
+      const after = await readRow(spreadsheetId, sheetName, rowNumber);
+      assertRowIdentity(after.row, { ...expected, ...(fields['자동화상태'] === undefined ? {} : { automationStatus: fields['자동화상태'] }) }, rowNumber);
+      for (const [header, value] of entries) {
+        if ((after.cells[requireUniqueHeader(after.headers, header) - 1] ?? '') !== value) throw new Error(`Sheet did not confirm ${header} at row ${rowNumber}`);
+      }
+    },
+
+    async writeDone(spreadsheetId, sheetName, rowNumber, resultColumn, expected) {
       requireDataRow(rowNumber);
+      if (expected) {
+        const current = await readRow(spreadsheetId,sheetName,rowNumber);
+        assertRowIdentity(current.row,expected,rowNumber);
+        resultColumn=current.row.resultColumn;
+      }
       const range = `${quoteSheetName(sheetName)}!${columnLetter(resultColumn)}${rowNumber}`;
       const response = await requestJson<ValuesResponse>(
         `${SHEETS_API_ROOT}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,

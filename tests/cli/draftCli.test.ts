@@ -6,6 +6,51 @@ import type { GoogleSheetsClient } from "../../src/sheets/googleSheetsClient";
 import type { LinkedSheetSource } from "../../src/sheets/sheetSource";
 
 describe("Tistory draft CLI", () => {
+  it('syncs a profile immediately before saving its draft', async () => {
+    const job = createJob('pending');
+    const linked = {...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'야구선수'}};
+    const order:string[]=[];
+    const client=createSheetsClient();
+    let completed=false;
+    client.readSourceRow=async () => ({keyword:'keyword',result:completed?'done':'',keywordColumn:18,resultColumn:19,automationStatus:completed?'COMPLETE':'READY',profile:{personId:'SP1'} as never});
+    const engine=createAutomation({ok:true}); engine.saveDraft=async()=> {order.push('draft');return {outcome:'confirmed',status:'draft_saved'};};
+    let calls=0;
+    const code=await main(runArgs(),{
+      findSheetSources:async()=>[linked],createSheetsClient:()=>client,
+      syncCompletedSheetPosts:async()=>{completed=calls++>0;return {synced:0,alreadyDone:0,pending:completed?[]:[linked]};},
+      loadPosts:async()=>[job],applyPolicy:async jobs=>jobs,attachAutomation:()=>engine,
+      syncProfileResult:async()=> {order.push('profile');return 'url';},
+      runPosts:async(jobs,automation)=> {await automation.saveDraft(jobs[0]!,{speed:'normal'});return {stopped:false,message:'complete'};},log:vi.fn()
+    });
+    expect(code).toBe(0);expect(order).toEqual(['profile','draft']);
+  });
+  it('does not report success if a profile becomes HOLD during saving and done is still blank',async()=>{
+    const job=createJob('pending');const source={...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'야구선수'}};
+    const client=createSheetsClient();let held=false;let calls=0;const errors:string[]=[];
+    client.readSourceRow=async()=>({keyword:'keyword',result:'',keywordColumn:18,resultColumn:19,automationStatus:held?'HOLD':'READY',profile:{personId:'SP1'} as never});
+    const engine=createAutomation({ok:true});engine.saveDraft=async()=>{held=true;return {outcome:'confirmed',status:'draft_saved'};};
+    const code=await main(runArgs(),{
+      findSheetSources:async()=>[source],createSheetsClient:()=>client,
+      syncCompletedSheetPosts:async()=>({synced:0,alreadyDone:0,pending:calls++===0?[source]:[]}),
+      loadPosts:async()=>[job],applyPolicy:async jobs=>jobs,attachAutomation:()=>engine,syncProfileResult:async()=> 'url',
+      runPosts:async(jobs,automation)=>{await automation.saveDraft(jobs[0]!,{speed:'normal'});return {stopped:false,message:'complete'};},
+      log:vi.fn(),error:message=>errors.push(message)
+    });
+    expect(code).toBe(1);expect(errors.join()).toContain('completion not confirmed');
+  });
+  it('filters inactive linked profile jobs before validation and drafting', async () => {
+    const job = createJob('validation_error');
+    const linked = {...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'야구선수'}};
+    const run = vi.fn(async (_jobs: PostJob[]) => ({stopped:false,message:'complete'}));
+    const code = await main(runArgs(),{
+      findSheetSources:async () => [linked],createSheetsClient,
+      syncCompletedSheetPosts:async () => ({synced:0,alreadyDone:0,pending:[]}),
+      loadPosts:async () => [job],applyPolicy:async jobs => jobs,
+      attachAutomation:() => createAutomation({ok:true}),runPosts:run
+    });
+    expect(code).toBe(0);
+    expect(run.mock.calls[0]?.[0]).toEqual([]);
+  });
   it.each([
     ["launched", "Dedicated Chrome opened. Sign in to Kakao/Tistory and keep it open."],
     ["already_running", "Dedicated Chrome is already open."]

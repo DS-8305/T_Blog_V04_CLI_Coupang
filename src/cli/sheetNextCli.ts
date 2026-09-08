@@ -1,10 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createGoogleSheetsClient, type GoogleSheetsClient } from "../sheets/googleSheetsClient";
+import { assertRowIdentity, createGoogleSheetsClient, type GoogleSheetsClient } from "../sheets/googleSheetsClient";
 import { selectFirstPendingRow } from "../sheets/sheetQueue";
 import { syncCompletedSheetPosts, type SheetSyncSummary } from "../sheets/sheetResultSync";
 import { buildSheetPostId, writeSheetSource } from "../sheets/sheetSource";
 import { parseSheetNextArgs } from "./sheetNextArgs";
+import { isProfileSheet, mapProfileSheetRow } from '../sheets/profileSheetRow';
+import { writeProfileTask } from '../sheets/profileTask';
+import type { SheetSource } from '../sheets/sheetSource';
+import { recordProfileError } from '../sheets/profileResultSync';
 
 export type SheetNextDependencies = {
   createClient: () => GoogleSheetsClient;
@@ -30,8 +34,20 @@ export async function sheetNextMain(
     const options = parseSheetNextArgs(argv);
     const client = createClient();
     const summary = await syncCompleted(options.workspacePath, client, log);
-    if (summary.pending.length > 0) {
-      const existing = summary.pending[0]!;
+    const existing = summary.pending.find(item => item.source.spreadsheetId === options.spreadsheetId && item.source.sheetName === options.sheetName);
+    if (existing) {
+      if (existing.source.version === 2 && (!(await pathExists(path.join(existing.postFolder,'profile-task.json'))) || !(await pathExists(path.join(existing.postFolder,'profile-prompt.txt'))))) {
+        const source=existing.source;
+        try {
+          const remote=await client.readSourceRow(source.spreadsheetId,source.sheetName,source.rowNumber);
+          assertRowIdentity(remote,{...source,automationStatus:'READY',result:''},source.rowNumber);
+          if (!remote.profile) throw new Error('Missing profile row data.');
+          await writeProfileTask(existing.postFolder,source,remote.profile,client);
+        } catch (error) {
+          await recordProfileError(existing.postFolder,client,error);
+          throw error;
+        }
+      }
       log(`Continue existing Sheet row ${existing.source.rowNumber}: ${existing.source.keyword}\n${existing.postFolder}`);
       return 0;
     }
@@ -48,15 +64,22 @@ export async function sheetNextMain(
     if (await pathExists(postFolder)) {
       throw new Error(`Post folder collision: ${postFolder}`);
     }
-    await writeSheetSource(postFolder, {
-      version: 1,
+    const row = isProfileSheet(queue.values[0] ?? []) ? mapProfileSheetRow(queue.values[0]!, queue.values[selected.rowNumber - 1]!) : undefined;
+    const source: SheetSource = {
+      version: row ? 2 : 1,
+      ...(row ? { personId: row.personId, promptType: row.promptType } : {}),
       spreadsheetId: options.spreadsheetId,
       sheetName: options.sheetName,
       rowNumber: selected.rowNumber,
       keywordHeader: "keyword",
       resultHeader: "result",
       keyword: selected.keyword
-    });
+    };
+    await writeSheetSource(postFolder, source);
+    if (row) {
+      try { await writeProfileTask(postFolder, source, row, client); }
+      catch (error) { await recordProfileError(postFolder,client,error); throw error; }
+    }
     log(`Imported Sheet row ${selected.rowNumber}: ${selected.keyword}\n${postFolder}`);
     return 0;
   } catch (error) {

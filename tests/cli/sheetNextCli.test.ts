@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { sheetNextMain } from "../../src/cli/sheetNextCli";
 import type { GoogleSheetsClient } from "../../src/sheets/googleSheetsClient";
 import { readSheetSource, writeSheetSource, type SheetSource } from "../../src/sheets/sheetSource";
+import { headers, profileCells, promptValues } from '../sheets/profileFixtures';
+import { mapProfileSheetRow } from '../../src/sheets/profileSheetRow';
 
 const temporaryRoots: string[] = [];
 const sheetId = "105xA7xNE-0FcvR06Tw4RruWuVgSCoZ-MaJ4Jw-QlE-g";
@@ -14,6 +16,30 @@ afterEach(async () => {
 });
 
 describe("sheetNextMain", () => {
+  it('repairs missing profile artifacts when a READY v2 import resumes', async () => {
+    const workspace=await makeWorkspace();const folder=path.join(workspace,'posts','000002-profile');
+    const source={...makeSource(),version:2 as const,personId:'SP000001',promptType:'야구선수',keyword:'테스트선수 프로필'};
+    await writeSheetSource(folder,source);
+    const client=fakeClient(promptValues);
+    client.readSourceRow=async()=>({keyword:source.keyword,result:'',keywordColumn:18,resultColumn:19,automationStatus:'READY',profile:mapProfileSheetRow(headers,profileCells())});
+    const code=await sheetNextMain(args(workspace),{createClient:()=>client,syncCompleted:async()=>({synced:0,alreadyDone:0,pending:[{postFolder:folder,source}]}),log:vi.fn()});
+    expect(code).toBe(0);
+    expect(await fs.readFile(path.join(folder,'profile-prompt.txt'),'utf8')).toContain('COMMON RULE');
+  });
+  it('creates v2 profile artifacts using the prompt tab', async () => {
+    const workspace = await makeWorkspace();
+    const client = fakeClient([]);
+    client.readQueue.mockImplementation(async (_id: string, tab: string) => ({ values:tab === '프롬프트_설정' ? promptValues : [headers,profileCells()],rowCount:50 }));
+    const code = await sheetNextMain([...args(workspace),'--sheet-name','Codex_작업큐'], {
+      createClient: () => client, syncCompleted: async () => ({ synced:0,alreadyDone:0,pending:[] }), log:vi.fn()
+    });
+    expect(code).toBe(0);
+    const folder = path.join(workspace,'posts',(await fs.readdir(path.join(workspace,'posts')))[0]!);
+    await expect(readSheetSource(folder)).resolves.toMatchObject({ version:2,personId:'SP000001' });
+    expect(JSON.parse(await fs.readFile(path.join(folder,'profile-task.json'),'utf8'))).toMatchObject({ personId:'SP000001',row:{team:'테스트팀'},promptIds:['COMMON_BASE','ATHLETE_BASE','BASEBALL','DOC_OUTPUT'] });
+    expect(await fs.readFile(path.join(folder,'profile-prompt.txt'),'utf8')).toContain('BASEBALL RULE');
+    await expect(fs.stat(path.join(folder,'content.txt'))).rejects.toThrow();
+  });
   it("creates one linked folder for the first pending row", async () => {
     const workspace = await makeWorkspace();
     const logs: string[] = [];

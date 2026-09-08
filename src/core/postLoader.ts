@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parseContent } from "./parser";
 import { readPostStatus } from "./statusStore";
+import { readSheetSource } from '../sheets/sheetSource';
 import type { PostJob, PostStatus, ValidationError } from "../shared/types";
 
 const terminalStatuses = new Set<PostStatus>(["draft_saved", "published", "scheduled"]);
@@ -18,7 +19,8 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
     const persistedStatus = await readPostStatus(folderPath);
     if (persistedStatus && terminalStatuses.has(persistedStatus.status)) continue;
 
-    const contentPath = await resolveContentPath(folderPath);
+    const isProfile = (await readSheetSource(folderPath))?.version === 2;
+    const contentPath = isProfile ? path.join(folderPath,'content.txt') : await resolveContentPath(folderPath);
     const content = await readContent(contentPath);
     if (content === null) {
       jobs.push({
@@ -47,6 +49,7 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
     }
 
     const parsed = parseContent(content, folderPath);
+    if (!isProfile) parsed.errors.push(...validateGenerationContract(content));
     const imageErrors = await validateImages(parsed.events, folderPath);
     parsed.errors.push(...imageErrors);
 
@@ -62,6 +65,21 @@ export async function loadPosts(workspacePath: string): Promise<PostJob[]> {
   }
 
   return jobs;
+}
+
+function validateGenerationContract(content: string): ValidationError[] {
+  const headings = [...content.matchAll(/\[H2\]([\s\S]*?)\[\/H2\]/g)];
+  const imageCount = [...content.matchAll(/\[IMAGE:[^\]]+\]/g)].length;
+  if (headings.length < 4 || imageCount < 4) return [];
+  const body = content
+    .replace(/참고한 공식 자료:[\s\S]*$/m, "")
+    .replace(/\[TITLE\][\s\S]*?\[\/TITLE\]/g, "")
+    .replace(/\[H2\]([\s\S]*?)\[\/H2\]/g, "$1")
+    .replace(/\[(?:BOLD|HR|IMAGE)(?::[^\]]+)?\]/g, "")
+    .replace(/\[\/BOLD\]/g, "")
+    .trim();
+  if (body.length >= 1800 && body.length <= 2000) return [];
+  return [{ code: "invalid_body_length", message: `Body must be 1,800-2,000 characters excluding title, markers, and sources; received ${body.length}.` }];
 }
 
 async function resolvePostsRoot(workspacePath: string): Promise<string> {

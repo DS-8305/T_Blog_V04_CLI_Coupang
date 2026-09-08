@@ -2,7 +2,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 export type SheetSource = {
-  version: 1;
+  version: 1 | 2;
+  personId?: string;
+  promptType?: string;
   spreadsheetId: string;
   sheetName: string;
   rowNumber: number;
@@ -96,7 +98,9 @@ async function resolvePostsRoot(workspacePath: string): Promise<string> {
 function isSheetSource(value: unknown): value is SheetSource {
   if (!value || typeof value !== "object") return false;
   const source = value as Partial<SheetSource>;
-  return source.version === 1
+  return (source.version === 1 || (source.version === 2
+      && typeof source.personId === 'string' && source.personId.trim().length > 0
+      && typeof source.promptType === 'string' && source.promptType.trim().length > 0))
     && typeof source.spreadsheetId === "string" && source.spreadsheetId.trim().length > 0
     && typeof source.sheetName === "string" && source.sheetName.trim().length > 0
     && Number.isSafeInteger(source.rowNumber) && Number(source.rowNumber) >= 2

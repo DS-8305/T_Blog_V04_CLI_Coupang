@@ -17,6 +17,14 @@ afterEach(async () => {
 });
 
 describe("sheet source manifests", () => {
+  it('round-trips v2 and rejects missing profile identity', async () => {
+    const folder = await makeTemporaryDirectory();
+    const source = { ...makeSource(), version: 2 as const, personId: 'SP001', promptType: '야구선수' };
+    await writeSheetSource(folder, source);
+    await expect(readSheetSource(folder)).resolves.toEqual(source);
+    await fs.writeFile(path.join(folder, 'sheet-source.json'), JSON.stringify({ ...source, personId: '' }));
+    await expect(readSheetSource(folder)).rejects.toThrow('Invalid');
+  });
   it("round-trips a versioned manifest", async () => {
     const folder = await makeTemporaryDirectory();
     const source = makeSource();

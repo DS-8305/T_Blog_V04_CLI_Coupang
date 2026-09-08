@@ -8,9 +8,11 @@ import { parseCliArgs } from "./cliArgs";
 import { launchCliChrome } from "./cliChrome";
 import { getCliProfilePath } from "./cliPaths";
 import { applyCliDraftPolicy } from "./cliPostPolicy";
-import { createGoogleSheetsClient, type GoogleSheetsClient } from "../sheets/googleSheetsClient";
+import { assertRowIdentity, createGoogleSheetsClient, type GoogleSheetsClient } from "../sheets/googleSheetsClient";
 import { syncCompletedSheetPosts } from "../sheets/sheetResultSync";
-import { findSheetSources } from "../sheets/sheetSource";
+import { findSheetSources, type LinkedSheetSource } from "../sheets/sheetSource";
+import { syncProfileResult, recordProfileError } from '../sheets/profileResultSync';
+import { profileDraftGuard } from './profileDraftGuard';
 
 export type CliDependencies = {
   getProfilePath: typeof getCliProfilePath;
@@ -22,6 +24,7 @@ export type CliDependencies = {
   findSheetSources: typeof findSheetSources;
   createSheetsClient: typeof createGoogleSheetsClient;
   syncCompletedSheetPosts: typeof syncCompletedSheetPosts;
+  syncProfileResult: typeof syncProfileResult;
   log: (message: string) => void;
   error: (message: string) => void;
 };
@@ -55,13 +58,23 @@ export async function main(
 
     let jobs: PostJob[] | undefined;
     let sheetsClient: GoogleSheetsClient | undefined;
+    let profiles: LinkedSheetSource[] = [];
     if (command.command === "run") {
       const linkedSources = await findSources(command.workspacePath);
+      let inactive = new Set<string>();
       if (linkedSources.length > 0) {
         sheetsClient = createSheetsClient();
-        await syncSheets(command.workspacePath, sheetsClient, log);
+        const summary = await syncSheets(command.workspacePath, sheetsClient, log);
+        const pending = new Set(summary.pending.map(item => item.postFolder));
+        inactive = new Set(linkedSources.filter(item => (item.source.version === 2 || sheetsClient!.writeProfileFields) && !pending.has(item.postFolder)).map(item => item.postFolder));
+        profiles = linkedSources.filter(item => item.source.version === 2 && !inactive.has(item.postFolder));
       }
-      jobs = await applyPolicy(await load(command.workspacePath));
+      jobs = await applyPolicy((await load(command.workspacePath)).filter(job => !inactive.has(job.folderPath)));
+      for (const job of jobs.filter(job => job.status === 'validation_error' || job.status === 'needs_review')) {
+        if (sheetsClient && profiles.some(p => p.postFolder === job.folderPath)) {
+          await recordProfileError(job.folderPath,sheetsClient,job.parsed.errors.map(e => e.message).join('; ') || 'Post needs manual review.');
+        }
+      }
       assertJobsRunnable(jobs);
     }
 
@@ -75,7 +88,13 @@ export async function main(
         return 0;
       }
 
-      const result = await run(jobs ?? [], automation, {
+      const attemptedProfiles = new Set<string>();
+      const syncProfile: typeof syncProfileResult = async (folder, client, options) => {
+        attemptedProfiles.add(folder);
+        return (overrides.syncProfileResult ?? syncProfileResult)(folder,client,options);
+      };
+      const guarded = sheetsClient && profiles.length ? profileDraftGuard(automation,profiles,sheetsClient,syncProfile) : automation;
+      const result = await run(jobs ?? [], guarded, {
         speed: command.speed,
         ...(command.maxPosts === undefined ? {} : { maxPosts: command.maxPosts }),
         closeEngine: false,
@@ -84,11 +103,19 @@ export async function main(
       if (result.stopped) throw new Error(result.message);
       if (sheetsClient) {
         const sheetSummary = await syncSheets(command.workspacePath, sheetsClient, log);
-        const pending = sheetSummary.pending[0];
+        const pending = sheetSummary.pending.find(item => item.source.version !== 2 || attemptedProfiles.has(item.postFolder));
         if (pending) {
           throw new Error(
             `Sheet completion pending for row ${pending.source.rowNumber}; retry this command to resume the done write.`
           );
+        }
+        for (const item of profiles.filter(item => attemptedProfiles.has(item.postFolder))) {
+          const {source} = item;
+          const finalRow = await sheetsClient.readSourceRow(source.spreadsheetId,source.sheetName,source.rowNumber);
+          assertRowIdentity(finalRow,source,source.rowNumber);
+          if (finalRow.result.trim().toLowerCase() !== 'done' || finalRow.automationStatus !== 'COMPLETE') {
+            throw new Error(`Profile row ${source.rowNumber} completion not confirmed: result=${finalRow.result || '(blank)'}, status=${finalRow.automationStatus}.`);
+          }
         }
       }
       log(result.message);
