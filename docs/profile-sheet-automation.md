@@ -17,6 +17,15 @@
 
 ## 현재 운영: 연결형 Sheets·Drive + 기존 CLI
 
+### 인물 분류별 대상 블로그
+
+- 운동선수 → `https://time-giver.tistory.com`
+- 정치인·공직자·공무원 → `https://moneyguru.tistory.com`
+
+`draft:run --blog-url auto`는 이번에 처리할 pending 작업의 분류로 주소를 결정한다. `profile-task.json`의 `row`, 연결형 `connector-source.json`의 `row`, 서비스 계정용 v2 `sheet-source.json`의 `promptType`을 읽으며, 이전 연결형 `sourceRow` 배열(A:Z 스냅샷)도 호환한다. 새 연결형 작업은 헤더로 매핑한 `row` 객체에 `majorType`, `detailType`, `promptType`을 보관한다. 연결된 시트의 최신 분류와 로컬 스냅샷을 실행 전에 대조한다.
+
+분류가 없거나 서로 충돌하면 auto 실행은 중단한다. 서로 다른 대상의 작업을 한 번에 실행하지 않는다. 주소를 명시하더라도 인물 분류에 맞지 않으면 브라우저 접속 전에 차단한다. 프로필 메타데이터가 없는 기존 일반 글은 명시한 주소를 계속 사용할 수 있다. `verify`에는 auto 대신 확인할 실제 블로그 주소를 지정한다. 계정에 해당 블로그 글쓰기 권한이 있어야 하며 기존 임시저장 글을 이동하거나 수정하지 않는다.
+
 2026-09-08 실제 운영에서 확인한 방식이다. **Google Sheets·Docs 작업은 Codex에 연결된 Google Drive 도구가 수행하고, CLI는 로컬 원고의 티스토리 임시저장만 수행한다.** 서비스 계정 JSON 설정 없이 사용하며, 아래의 서비스 계정 직접 API 경로와 구분한다. 연결 도구를 호출하는 독립 백그라운드 프로세스가 구현된 것은 아니다.
 
 1. 연결 도구로 작업 탭과 프롬프트 탭을 읽고 첫 READY/빈 result 행 하나를 선택한다. 행 번호뿐 아니라 인물ID·keyword도 확인한다.
@@ -27,7 +36,7 @@
 6. 로그인한 전용 Chrome을 유지한 채 아래 명령으로 1건을 임시저장한다.
 
 ```powershell
-pnpm.cmd run draft:run -- --workspace 'C:\Blog\ProfileWorkspace' --blog-url moneyguru.tistory.com --max-posts 1
+pnpm.cmd run draft:run -- --workspace 'C:\Blog\ProfileWorkspace' --blog-url auto --max-posts 1
 ```
 
 7. CLI 로그와 `status.json=draft_saved`, `_SUCCESS.done`을 확인한 후, 연결 도구로 행 식별자와 상태를 다시 확인하고 S=`done`을 기록·재조회한다. 이어 Q=`COMPLETE`를 기록·재조회한다. 완료 기록 요청에 한해 S의 기존 상태 계산 수식은 명시적 done 값으로 대체한다.
@@ -171,8 +180,8 @@ pnpm profile:sync --post 'C:\Blog\ProfileWorkspace\posts\선택된-폴더명'
 
 ```powershell
 pnpm draft:login
-pnpm draft:verify --blog-url 'moneyguru.tistory.com'
-pnpm draft:run --workspace 'C:\Blog\ProfileWorkspace' --blog-url 'moneyguru.tistory.com' --max-posts 1
+pnpm draft:verify --blog-url 'time-giver.tistory.com'
+pnpm draft:run --workspace 'C:\Blog\ProfileWorkspace' --blog-url auto --max-posts 1
 ```
 
 6. draft 실행은 각 프로필을 저장하기 직전에 결과 동기화와 READY/빈 result/인물ID/키워드를 재확인한다. 기존 임시저장 엔진으로 저장하고 로컬 `status.json=draft_saved` 확인 후에만 S에 `done`을 쓴다. 다시 읽어 확인한 뒤 Q를 `COMPLETE`로 변경·확인하고 `sheet-completion.json=sheet_done`을 남긴다.

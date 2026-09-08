@@ -2,6 +2,8 @@
 
 인물 프로필 CLI 배포 저장소: **[DS-8305/T_Blog_V02_CLI](https://github.com/DS-8305/T_Blog_V02_CLI)** (`main`). 기존 V01의 이력과 CLI를 기반으로 합니다. 현재 사용하는 연결형 Sheets·Drive 운영 절차는 [프로필 작업 안내](docs/profile-sheet-automation.md#현재-운영-연결형-sheetsdrive--기존-cli)를 먼저 확인하세요.
 
+인물 프로필은 `draft:run --blog-url auto`로 실행합니다. **운동선수는 time-giver, 정치인·공직자는 moneyguru**로 선택되며, 분류 충돌이나 명시한 주소 불일치는 저장 전에 차단됩니다. 자세한 명령과 메타데이터 형식은 위 운영 안내를 따릅니다.
+
 Windows에서 로컬 `content.txt`를 읽어 한 개의 티스토리 블로그에 임시저장, 즉시 공개 또는 예약 공개하는 Electron 앱입니다. Kakao 로그인은 전용 Chrome에서 사용자가 직접 수행하며 앱은 인증 정보를 저장하지 않습니다.
 
 ## 실행

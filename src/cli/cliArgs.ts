@@ -32,7 +32,7 @@ export function parseCliArgs(argv: string[]): CliCommand {
   const options = parseOptions(rest, allowed);
   const rawBlogUrl = options.get("--blog-url");
   if (!rawBlogUrl) throw new Error("--blog-url is required");
-  const blogUrl = normalizeTistoryBlogUrl(rawBlogUrl);
+  const blogUrl = command === 'run' && rawBlogUrl === 'auto' ? 'auto' : normalizeTistoryBlogUrl(rawBlogUrl);
 
   if (command === "verify") return { command, blogUrl };
 

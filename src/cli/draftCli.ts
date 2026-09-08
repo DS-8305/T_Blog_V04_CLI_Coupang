@@ -13,6 +13,7 @@ import { syncCompletedSheetPosts } from "../sheets/sheetResultSync";
 import { findSheetSources, type LinkedSheetSource } from "../sheets/sheetSource";
 import { syncProfileResult, recordProfileError } from '../sheets/profileResultSync';
 import { profileDraftGuard } from './profileDraftGuard';
+import { resolveProfileBlog } from './profileBlogRouting';
 
 export type CliDependencies = {
   getProfilePath: typeof getCliProfilePath;
@@ -78,7 +79,10 @@ export async function main(
       assertJobsRunnable(jobs);
     }
 
-    const automation = attachAutomation(MANUAL_CHROME_CDP_ENDPOINT, command.blogUrl);
+    const blogUrl = command.command === 'run'
+      ? await resolveProfileBlog((jobs ?? []).filter(job => job.status === 'pending').slice(0, command.maxPosts).map(job => job.folderPath), command.blogUrl)
+      : command.blogUrl;
+    const automation = attachAutomation(MANUAL_CHROME_CDP_ENDPOINT, blogUrl);
     try {
       const verification = await automation.verifySession();
       if (!verification.ok) throw new Error(verification.message);
