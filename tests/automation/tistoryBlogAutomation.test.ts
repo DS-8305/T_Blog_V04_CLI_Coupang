@@ -35,7 +35,9 @@ describe("TistoryBlogAutomation session verification", () => {
     );
 
     await automation.close();
-    expect(harness.browser.close).not.toHaveBeenCalled();
+    expect(harness.browser.close).toHaveBeenCalledOnce();
+    await automation.close();
+    expect(harness.browser.close).toHaveBeenCalledOnce();
   });
 
   it("reuses the editor opened by verification when saving a draft", async () => {
@@ -382,6 +384,10 @@ function createDraftFinalizationPage() {
       if (selector === tistorySelectors.draftButton[0]) draftCount += 1;
     }),
     getAttribute: vi.fn(async () => null),
+    evaluateAll: vi.fn(async (callback: (elements: unknown[]) => unknown) => callback(
+      selector === tistorySelectors.draftCount[0]
+        ? [{ getAttribute: () => null, textContent: String(draftCount) }] : []
+    )),
     innerText: vi.fn(async () => String(draftCount))
   });
   return {

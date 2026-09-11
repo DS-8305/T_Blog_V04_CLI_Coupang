@@ -21,6 +21,7 @@
     "build": "tsc -p tsconfig.json --noEmit && pnpm run main:build && pnpm run cli:build && pnpm run sheet:build && vite build",
     "dist:portable": "pnpm run build && electron-builder --win portable --x64",
     "test": "vitest run --passWithNoTests",
+    "test:browser": "cross-env TISTORY_BROWSER_TESTS=1 vitest run tests/automation/cdpLifecycle.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

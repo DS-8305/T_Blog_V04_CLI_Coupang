@@ -49,7 +49,45 @@ describe("Tistory draft CLI", () => {
       attachAutomation:() => createAutomation({ok:true}),runPosts:run
     });
     expect(code).toBe(0);
-    expect(run.mock.calls[0]?.[0]).toEqual([]);
+    expect(run).not.toHaveBeenCalled();
+  });
+  it.each(['auto', 'sample.tistory.com'])('finishes an empty queue without Chrome (%s)', async blogUrl => {
+    const attachAutomation = vi.fn(() => { throw new Error('Chrome is not running'); });
+    const logs: string[] = [];
+    const code = await main(['run', '--workspace', 'C:\\empty', '--blog-url', blogUrl], {
+      findSheetSources: async () => [], loadPosts: async () => [],
+      attachAutomation, log: message => logs.push(message), error: vi.fn()
+    });
+    expect(code).toBe(0);
+    expect(logs.join()).toContain('No pending posts');
+    expect(attachAutomation).not.toHaveBeenCalled();
+  });
+
+  it('recovers completed Sheet writes without opening Chrome', async () => {
+    const sync = vi.fn(async () => ({ synced: 1, alreadyDone: 0, pending: [] }));
+    const attachAutomation = vi.fn(() => { throw new Error('Chrome is not running'); });
+    const code = await main(runArgs(), {
+      findSheetSources: async () => [linkedSource()], createSheetsClient,
+      syncCompletedSheetPosts: sync, loadPosts: async () => [],
+      attachAutomation, log: vi.fn(), error: vi.fn()
+    });
+    expect(code).toBe(0);
+    expect(sync).toHaveBeenCalledOnce();
+    expect(attachAutomation).not.toHaveBeenCalled();
+  });
+
+  it('does not hide pending Sheet completion when no posts remain', async () => {
+    const errors: string[] = [];
+    const attachAutomation = vi.fn(() => { throw new Error('Chrome is not running'); });
+    const code = await main(runArgs(), {
+      findSheetSources: async () => [linkedSource()], createSheetsClient,
+      syncCompletedSheetPosts: async () => ({ synced: 0, alreadyDone: 0, pending: [linkedSource()] }),
+      loadPosts: async () => [], attachAutomation,
+      error: message => errors.push(message)
+    });
+    expect(code).toBe(1);
+    expect(errors.join()).toContain('Sheet completion pending for row 2');
+    expect(attachAutomation).not.toHaveBeenCalled();
   });
   it.each([
     ["launched", "Dedicated Chrome opened. Sign in to Kakao/Tistory and keep it open."],

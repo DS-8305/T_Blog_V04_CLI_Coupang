@@ -14,6 +14,16 @@ pnpm test
 pnpm run electron:dev
 ```
 
+CLI의 `draft:verify`와 `draft:run`은 작업 후 Chrome 연결을 해제하고 종료 코드를 반환합니다. 사용자가 로그인한 전용 Chrome 창과 탭은 유지됩니다. 처리할 글이 없으면 `draft:run --blog-url auto`도 브라우저 연결 없이 종료하며, 서비스 계정으로 연결된 시트의 완료 기록 복구를 먼저 수행합니다.
+
+Chrome이 설치된 환경에서는 실제 브라우저 회귀 테스트도 실행할 수 있습니다.
+
+```powershell
+pnpm run test:browser
+```
+
+이 테스트는 임시 프로필·임의의 로컬 포트·로컬 테스트 페이지를 사용합니다. 로그인이나 실제 티스토리 저장 없이 CLI 정상 종료, Chrome 유지, 임시저장 개수 표시가 없는 화면의 응답 시간을 검증합니다. 일반 `pnpm test`에서는 이 브라우저 테스트를 건너뜁니다.
+
 ## Google Sheets 한 행 임시저장 사이클
 
 인물 프로필 작업은 [Google Sheet 인물 프로필 자동화 안내](docs/profile-sheet-automation.md)를 따릅니다. `Codex_작업큐`의 READY 행과 시트 프롬프트를 사용하며, `profile:sync`로 결과·Docs를 보관한 뒤 임시저장 성공 시에만 `done → COMPLETE`를 기록합니다. 요청 문장: **“다음 인물 프로필 작업 진행해줘.”**

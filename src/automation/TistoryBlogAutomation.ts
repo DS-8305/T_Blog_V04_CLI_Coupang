@@ -224,11 +224,13 @@ export class TistoryBlogAutomation implements AutomationEngine {
   async close(): Promise<void> {
     this.sessionVerified = false;
     this.verifiedEditorReady = false;
-    // This Browser belongs to the manually launched Chrome process. Calling
-    // Browser.close() would terminate the user's logged-in window.
+    const browser = this.browser;
     this.browser = null;
     this.context = null;
     this.page = null;
+    // connectOverCDP owns only the attachment: close disconnects its transport
+    // while leaving the externally launched Chrome and its tabs running.
+    await browser?.close();
   }
 
   private async getPage(): Promise<Page> {
@@ -328,10 +330,16 @@ export class TistoryBlogAutomation implements AutomationEngine {
   private async readDraftCount(page: Page): Promise<number | null> {
     for (const selector of tistorySelectors.draftCount) {
       const locator = page.locator(selector).first();
-      const value = await locator.getAttribute("aria-label").catch(() => null)
-        ?? await locator.innerText().catch(() => null);
-      const match = value?.match(/\d+/);
-      if (match) return Number(match[0]);
+      // Optional evidence must not auto-wait for a missing counter (twice per
+      // probe with getAttribute/innerText). Snapshot both values in one call.
+      const values = await locator.evaluateAll(elements => {
+        const element = elements[0];
+        return element ? [element.getAttribute("aria-label"), element.textContent] : [];
+      }).catch(() => []);
+      for (const value of values) {
+        const match = value?.match(/\d+/);
+        if (match) return Number(match[0]);
+      }
     }
     return null;
   }

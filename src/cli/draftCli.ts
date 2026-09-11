@@ -62,10 +62,12 @@ export async function main(
     let profiles: LinkedSheetSource[] = [];
     if (command.command === "run") {
       const linkedSources = await findSources(command.workspacePath);
+      let pendingSheetSources: LinkedSheetSource[] = [];
       let inactive = new Set<string>();
       if (linkedSources.length > 0) {
         sheetsClient = createSheetsClient();
         const summary = await syncSheets(command.workspacePath, sheetsClient, log);
+        pendingSheetSources = summary.pending;
         const pending = new Set(summary.pending.map(item => item.postFolder));
         inactive = new Set(linkedSources.filter(item => (item.source.version === 2 || sheetsClient!.writeProfileFields) && !pending.has(item.postFolder)).map(item => item.postFolder));
         profiles = linkedSources.filter(item => item.source.version === 2 && !inactive.has(item.postFolder));
@@ -77,6 +79,14 @@ export async function main(
         }
       }
       assertJobsRunnable(jobs);
+      if (!jobs.some(job => job.status === 'pending')) {
+        const pending = pendingSheetSources[0];
+        if (pending) {
+          throw new Error(`Sheet completion pending for row ${pending.source.rowNumber}; no runnable local post was found. Check its local status before retrying.`);
+        }
+        log('No pending posts. Sheet completion recovery is up to date.');
+        return 0;
+      }
     }
 
     const blogUrl = command.command === 'run'
