@@ -1,9 +1,14 @@
 import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PostJob, ValidationError } from "../shared/types";
 
 const allowedPairedMarkers = new Set(["TITLE", "H2", "BOLD"]);
+const disclosureAssetRelativePath = "assets/cli/coupang-partners-disclosure.png";
 
 export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
+  const disclosureImagePath = await resolveDisclosureImagePath();
+
   return Promise.all(jobs.map(async (job) => {
     const content = await fs.readFile(job.contentPath, "utf8");
     const errors = [
@@ -11,11 +16,21 @@ export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
       ...findForbiddenMarkerErrors(content)
     ];
 
+    const titleEventIndex = job.parsed.events.findIndex((event) => event.type === "setTitle");
+    const insertionIndex = titleEventIndex < 0 ? 0 : titleEventIndex + 1;
+    const events = [...job.parsed.events];
+    events.splice(insertionIndex, 0, {
+      type: "insertImage",
+      relativePath: disclosureAssetRelativePath,
+      absolutePath: disclosureImagePath
+    });
+
     return {
       ...job,
       status: errors.length > 0 ? "validation_error" as const : job.status,
       parsed: {
         ...job.parsed,
+        events,
         metadata: {
           publication: "draft" as const,
           category: null,
@@ -26,6 +41,25 @@ export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
       }
     };
   }));
+}
+
+async function resolveDisclosureImagePath(): Promise<string> {
+  const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(moduleDirectory, "../", disclosureAssetRelativePath),
+    path.resolve(moduleDirectory, "../../", disclosureAssetRelativePath)
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // Try the source-layout path after the bundled CLI path.
+    }
+  }
+
+  throw new Error(`Required CLI disclosure image is missing: ${disclosureAssetRelativePath}`);
 }
 
 function findForbiddenMarkerErrors(content: string): ValidationError[] {
