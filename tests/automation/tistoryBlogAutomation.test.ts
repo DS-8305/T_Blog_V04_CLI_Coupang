@@ -71,6 +71,45 @@ describe("TistoryBlogAutomation session verification", () => {
     expect(harness.page.goto).toHaveBeenCalledTimes(1);
   });
 
+  it("injects Coupang widgets after article metadata and before saving every flagged CLI draft", async () => {
+    const actions: string[] = [];
+    const harness = createHarness({
+      visibleSelectors: [tistorySelectors.editorReady[0], tistorySelectors.body[0]]
+    });
+    playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
+    const automation = TistoryBlogAutomation.attach(
+      "http://127.0.0.1:9222",
+      "https://sample.tistory.com"
+    );
+    vi.spyOn(automation, "applyMetadata").mockImplementation(async () => { actions.push("metadata"); });
+    const automationWithPrivateMethod = automation as unknown as {
+      injectCoupangWidgets: () => Promise<void>;
+    };
+    vi.spyOn(automationWithPrivateMethod, "injectCoupangWidgets")
+      .mockImplementation(async () => { actions.push("widgets"); });
+    vi.spyOn(automation, "finalizePost").mockImplementation(async () => {
+      actions.push("save");
+      return { outcome: "confirmed", status: "draft_saved" };
+    });
+
+    await automation.verifySession();
+    await automation.saveDraft({
+      id: "001-post",
+      folderPath: "C:\\post",
+      contentPath: "C:\\post\\content.txt",
+      status: "pending",
+      injectCoupangWidgets: true,
+      parsed: {
+        title: "새 글",
+        metadata: { publication: "draft", category: null, tags: [], scheduledAt: null },
+        events: [],
+        errors: []
+      }
+    }, { speed: "fast" });
+
+    expect(actions).toEqual(["metadata", "widgets", "save"]);
+  });
+
   it("absorbs a dialog race when another Chrome client handles beforeunload first", async () => {
     const harness = createHarness({ visibleSelectors: [tistorySelectors.editorReady[0]] });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
@@ -163,6 +202,11 @@ describe("TistoryBlogAutomation session verification", () => {
 });
 
 describe("TistoryBlogAutomation editor events", () => {
+  it("targets the visible HTML editor mode control when Tistory hides the legacy TinyMCE control", () => {
+    expect(tistorySelectors.editorModeButton).toContain(
+      "#html-editor-container .mce-toolbar-grp .mce-flow-layout-item.mce-last .mce-btn-has-text button"
+    );
+  });
   it("uses the live TinyMCE toolbar attributes for 제목1 and divider controls", () => {
     expect(tistorySelectors.formatMenu[0]).toBe("[aria-label='문단모양'] button");
     expect(tistorySelectors.divider[0]).toBe("[aria-label='구분선'] button");

@@ -34,6 +34,14 @@ describe("applyCliDraftPolicy", () => {
     expect(job.parsed.metadata.publication).toBe("public");
   });
 
+  it("enables the Coupang widgets for every CLI draft job", async () => {
+    const job = await createJob("[TITLE]A[/TITLE]\n[H2]First[/H2]\n[H2]Second[/H2]");
+
+    const [result] = await applyCliDraftPolicy([job]);
+
+    expect(result.injectCoupangWidgets).toBe(true);
+  });
+
   it("rejects every desktop-only marker once per marker name", async () => {
     const job = await createJob([
       "[TITLE]A[/TITLE]",

@@ -27,6 +27,7 @@ export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
 
     return {
       ...job,
+      injectCoupangWidgets: true,
       status: errors.length > 0 ? "validation_error" as const : job.status,
       parsed: {
         ...job.parsed,

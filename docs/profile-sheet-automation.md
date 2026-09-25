@@ -142,7 +142,7 @@ $env:PROFILE_DOCS_FOLDER_ID = '공유_드라이브_안의_저장_폴더_ID'
 
 Codex가 조사 후 작성할 파일:
 
-1. `content.txt`: 티스토리 원고. 허용 마커는 **TITLE, H2, BOLD, HR, IMAGE** 5종뿐이다. PUBLISH, CATEGORY, TAGS, SCHEDULE, BODY, SOURCES, QUOTE를 넣지 않는다. 기존 draft 강제 정책과 입력 셀렉터는 바꾸지 않는다.
+1. `content.txt`: 티스토리 원고. 허용 마커는 **TITLE, H2, BOLD, HR, IMAGE** 5종뿐이다. PUBLISH, CATEGORY, TAGS, SCHEDULE, BODY, SOURCES, QUOTE를 넣지 않는다. 기존 draft 강제 정책을 유지한다. CLI는 원고와 메타데이터 입력 후 임시저장 직전에 HTML 모드로 전환하고, 첫째·둘째 H2 아래에 쿠팡 파트너스 위젯을 추가해 소스에서 확인한다. 이 코드는 `content.txt` 및 프로필 결과 본문에 포함하지 않는다.
 2. `profile-result.json`: 시트/Docs용 원고와 분리된 메타데이터.
 
 ```json

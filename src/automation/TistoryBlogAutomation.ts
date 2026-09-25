@@ -8,6 +8,7 @@ import {
   TISTORY_SECURITY_TEXT,
   tistorySelectors
 } from "./tistorySelectors";
+import { insertCoupangWidgetsAfterFirstTwoH2 } from "./coupangWidgetHtml";
 
 export class TistoryBlogAutomation implements AutomationEngine {
   private browser: Browser | null = null;
@@ -16,6 +17,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
   private sessionVerified = false;
   private verifiedEditorReady = false;
   private dialogManagedPages = new WeakSet<Page>();
+  private expectedModeChangeDialogPages = new WeakSet<Page>();
 
   private constructor(
     private readonly cdpEndpoint: string,
@@ -32,6 +34,9 @@ export class TistoryBlogAutomation implements AutomationEngine {
     try {
       const page = await this.getPage();
       await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
+      if (await this.anyVisible(page, tistorySelectors.editorModeButton)) {
+        await this.setEditorMode(page, "기본모드");
+      }
       const bodyText = await page.locator("body").first().innerText().catch(() => "");
       const evidence = {
         url: page.url(),
@@ -91,6 +96,9 @@ export class TistoryBlogAutomation implements AutomationEngine {
         await page.goto(`${this.blogUrl}/manage/newpost`, { waitUntil: "domcontentloaded" });
       }
       this.verifiedEditorReady = false;
+      if (await this.anyVisible(page, tistorySelectors.editorModeButton)) {
+        await this.setEditorMode(page, "기본모드");
+      }
       await this.firstEditorBody(page, 10_000);
       const speed = getTypingSpeedProfile(options.speed);
       for (const event of job.parsed.events) {
@@ -99,6 +107,7 @@ export class TistoryBlogAutomation implements AutomationEngine {
         options.onLog?.(`Entered ${event.type}`);
       }
       await this.applyMetadata(page, job);
+      if (job.injectCoupangWidgets) await this.injectCoupangWidgets(page);
       return await this.finalizePost(page, job);
     } catch (error) {
       return {
@@ -252,12 +261,53 @@ export class TistoryBlogAutomation implements AutomationEngine {
     this.dialogManagedPages.add(page);
     page.on("dialog", async (dialog) => {
       try {
-        if (dialog.type() === "beforeunload") await dialog.accept();
-        else await dialog.dismiss();
+        if (dialog.type() === "beforeunload") {
+          await dialog.accept();
+        } else if (this.expectedModeChangeDialogPages.delete(page)) {
+          if (dialog.type() === "confirm" && /작성 모드를 변경/.test(dialog.message())) await dialog.accept();
+          else await dialog.dismiss();
+        } else {
+          await dialog.dismiss();
+        }
       } catch {
         // Another Chrome client may handle the same dialog first.
       }
     });
+  }
+
+  private async setEditorMode(page: Page, targetMode: "기본모드" | "HTML"): Promise<void> {
+    const modeButton = await this.firstVisible(page, tistorySelectors.editorModeButton, 10_000);
+    const currentMode = (await modeButton.innerText()).trim();
+    if (currentMode.includes(targetMode)) return;
+
+    await modeButton.click();
+    this.expectedModeChangeDialogPages.add(page);
+    const option = targetMode === "HTML" ? tistorySelectors.editorModeHtml : tistorySelectors.editorModeBasic;
+    await (await this.firstVisible(page, option, 5_000)).click();
+    await page.waitForTimeout(500);
+    const selectedMode = (await (await this.firstVisible(page, tistorySelectors.editorModeButton, 5_000)).innerText()).trim();
+    if (!selectedMode.includes(targetMode)) {
+      throw new Error(`Tistory editor did not switch to ${targetMode} mode.`);
+    }
+  }
+
+  private async injectCoupangWidgets(page: Page): Promise<void> {
+    await this.setEditorMode(page, "HTML");
+    const source = await this.firstVisible(page, tistorySelectors.editorHtmlSource, 10_000);
+    const readSource = async () => source.evaluate((element) => {
+      const editor = (element as HTMLElement & { CodeMirror?: { getValue(): string } }).CodeMirror;
+      if (!editor) throw new Error("Tistory HTML editor is not ready.");
+      return editor.getValue();
+    });
+    const currentHtml = await readSource();
+    const updatedHtml = insertCoupangWidgetsAfterFirstTwoH2(currentHtml);
+    await source.evaluate((element, html) => {
+      const editor = (element as HTMLElement & { CodeMirror?: { setValue(value: string): void } }).CodeMirror;
+      if (!editor) throw new Error("Tistory HTML editor is not ready.");
+      editor.setValue(html);
+    }, updatedHtml);
+    const editorHtml = await readSource();
+    if (editorHtml !== updatedHtml) throw new Error("Coupang widget HTML did not persist in the editor source.");
   }
 
   private async anyVisible(page: Page, selectors: readonly string[]): Promise<boolean> {

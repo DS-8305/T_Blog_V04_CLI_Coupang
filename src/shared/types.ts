@@ -53,6 +53,7 @@ export type PostJob = {
   folderPath: string;
   contentPath: string;
   status: PostStatus;
+  injectCoupangWidgets?: boolean;
   parsed: ParsedPost;
 };
 

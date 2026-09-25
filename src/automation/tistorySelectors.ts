@@ -33,6 +33,13 @@ export const tistorySelectors = {
   photoMenuItem: ["[role='menuitem']:has-text('사진')"],
   categoryButton: ["button:has-text('카테고리')", "button[aria-label*='카테고리']"],
   tagInput: ["input[placeholder*='태그']", "input[aria-label*='태그']"],
+  editorModeButton: [
+    "#editor-mode-layer-btn-open",
+    "#html-editor-container .mce-toolbar-grp .mce-flow-layout-item.mce-last .mce-btn-has-text button"
+  ],
+  editorModeBasic: ["#editor-mode-kakao"],
+  editorModeHtml: ["#editor-mode-html"],
+  editorHtmlSource: [".cm-s-tistory-html"],
   draftButton: [
     "a.action[role='button']:has-text('임시저장')",
     "[role='button'].action:has-text('임시저장')",
