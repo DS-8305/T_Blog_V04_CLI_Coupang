@@ -48,6 +48,52 @@ pnpm.cmd run draft:run -- --workspace 'C:\Blog\ProfileWorkspace' --blog-url auto
 
 실제 확인 결과: 작업큐 10행 주권(SP000009), 본문 1,134자, 임시저장 성공, 지정 폴더 Google 문서 보관, S10=`done`, Q10=`COMPLETE`. 원고·문서 ID·로그·인증 정보는 배포 저장소에 넣지 않는다. 서비스 계정 API 전체 경로의 라이브 성공을 의미하지 않는다.
 
+## 연결형 연속 작업의 시간 단축
+
+**품질 기준은 유지한다.** 요청일의 서울 날짜를 기준으로 최신 공식 자료를 조사하고, 동명이인·현 소속·기록·날짜를 교차 검증한다. 현재 시트 프롬프트의 분량·소제목·문체를 준수하고 최종 원고를 검수한다. 인물 이미지 생성은 하지 않으며 CLI가 넣는 고정 안내 이미지와 두 쿠팡 위젯은 유지한다. 조사나 검수를 생략해 시간을 맞추지 않는다.
+
+1. 작업 시작 시 A1:Z1 헤더와 프롬프트를 읽고, 큐는 제한된 범위부터 읽어 READY/keyword/빈 result 행을 찾는다. 없으면 다음 범위로 확장한다. 같은 실행 중 동일 프롬프트를 재사용하되 사용자가 변경을 알리면 갱신한다. 쓰기 직전 선택 행의 인물ID·keyword·READY·빈 result와 대상 열을 확인한다.
+2. 선택 인물의 공식 프로필·최근 기록·최근 소속 정보를 묶어 조사한다. 출처가 충돌하거나 부족하면 추가 조사한다. 완성 원고는 한 번만 작성한다.
+3. 아래 준비 도구로 원고에서 파일과 연결 도구용 입력 데이터를 만든다. 결과의 글자 수·H2 수·경고를 현재 프롬프트와 대조하고 원고 자체를 검수한다. 도구는 최신성이나 사실 정확성을 판정하지 않는다.
+4. 생성한 `connector-payload.json`의 document를 Docs 생성에, sheet를 T:X 쓰기에 사용한다. 고정 T:X 스키마 전용이므로 현재 헤더가 다르면 그대로 적용하지 않는다. Y에는 실제 생성한 문서 URL을 기록한다. 기존 문서 URL/ID가 있으면 중복 생성하지 않는다. 연결 도구의 실제 입력 스키마에 맞춰 전달하며 결과를 재조회한다.
+5. 빌드를 한 번 수행한 뒤 같은 실행에서는 아래 node 명령으로 한 건씩 임시저장한다. `run`이 세션 검증을 포함하므로 별도 verify는 로그인 문제 진단 때만 사용한다. fast는 기존의 글자 입력 간격만 45ms에서 20ms로 줄이며 원고·서식·저장 확인은 동일하다.
+6. 기존 절차대로 저장 증거 확인 → S done 확인 → Q COMPLETE 확인 → 완료 기록을 마친 후 다음 한 행을 시작한다. 불확실한 결과는 중단하고 확인한다.
+
+```powershell
+# 코드 변경 후 또는 작업 시작 시 한 번
+pnpm.cmd run cli:build
+pnpm.cmd run sheet:build
+# 매 원고 준비: 입력 JSON은 저장소 밖 작업 폴더에 UTF-8로 저장
+node dist-cli/profilePrepareCli.js --workspace 'C:\Blog\ProfileWorkspace' --input 'C:\Blog\ProfileWorkspace\prepare-input.json'
+# 매 한 건 임시저장
+node dist-cli/draftCli.js run --workspace 'C:\Blog\ProfileWorkspace' --blog-url auto --speed fast --max-posts 1
+```
+
+입력 JSON 형식(예시 원고는 구조 설명용이며 실제 작업은 프롬프트 분량과 소제목 수를 충족해야 한다):
+
+```json
+{
+  "content": "[TITLE]선수 이름 프로필[/TITLE]\n도입부\n[HR]\n[H2]프로필[/H2]\n본문\n[HR]\n[H2]최근 기록[/H2]\n본문",
+  "latestInfoDate": "2026-09-25",
+  "tags": ["실제 태그"],
+  "sources": [{"name":"공식 기관","title":"확인한 자료","date":"","url":"https://example.org/profile"}],
+  "source": {
+    "spreadsheetId":"실제 스프레드시트 ID", "sheetId":1377924888,
+    "sheetName":"Codex_작업큐", "rowNumber":22,
+    "personId":"실제 인물ID", "keyword":"실제 keyword",
+    "row": {
+      "personId":"실제 인물ID", "name":"선수 이름",
+      "majorType":"운동선수", "detailType":"야구선수", "promptType":"야구선수",
+      "keyword":"실제 keyword", "automationStatus":"READY", "result":""
+    }
+  }
+}
+```
+
+`source`에는 실제 읽은 행과 프롬프트 스냅샷을 추가로 보관할 수 있다. 날짜와 예시 식별자를 그대로 재사용하지 않는다. 준비 도구는 `content.txt`, `profile-result.json`, `connector-source.json`, `connector-payload.json`을 만들며 외부 서비스에 쓰지 않는다. 기존 폴더 또는 같은 스프레드시트의 같은 인물ID가 있으면 덮어쓰지 않고 중단한다. 실패나 재개 시 기존 파일·저장 증거부터 확인한다.
+
+`run-log.txt`의 `[timing]`에는 편집기 준비, 원고 입력, 메타데이터, 위젯, 저장 확인의 구간별 시간이 기록된다. 연구·검수·Docs·Sheets 소요 시간은 포함하지 않는다. 실제 단축 폭은 다음 승인된 작성 실행에서 전체 시간과 함께 비교한다.
+
 ## 서비스 계정 경로: 환경변수와 Google 설정
 
 ```powershell

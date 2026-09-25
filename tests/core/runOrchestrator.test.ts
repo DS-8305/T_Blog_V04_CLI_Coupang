@@ -22,6 +22,23 @@ function makeJob(folderPath: string): PostJob {
 }
 
 describe("runPosts", () => {
+  it("persists stage timing even when saving fails and forwards progress", async () => {
+    const folder = await fs.mkdtemp(path.join(os.tmpdir(), "run-timing-"));
+    const messages: string[] = [];
+    const engine: AutomationEngine = {
+      async verifySession() { return { ok: true }; },
+      async saveDraft(_job, options) {
+        options.onLog?.("[timing] input: 120 ms");
+        throw new Error("save failed");
+      },
+      async close() {}
+    };
+    const result = await runPosts([makeJob(folder)], engine, {speed:"fast", onLog: message => messages.push(message)});
+    expect(result.stopped).toBe(true);
+    expect(messages).toContain("[timing] input: 120 ms");
+    expect(await fs.readFile(path.join(folder,"run-log.txt"),"utf8")).toContain("[timing] input: 120 ms");
+    await expect(fs.access(path.join(folder,"_SUCCESS.done"))).rejects.toThrow();
+  });
   it("records needs_review and stops without retrying an uncertain final action", async () => {
     const folder = await fs.mkdtemp(path.join(os.tmpdir(), "run-uncertain-"));
     const laterFolder = await fs.mkdtemp(path.join(os.tmpdir(), "run-uncertain-later-"));

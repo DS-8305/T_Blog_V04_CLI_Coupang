@@ -5,7 +5,7 @@ import { normalizeTistoryBlogUrl } from '../core/blogConfig';
 const athleteTypes = new Set(['운동선수', '야구선수', '축구선수', '농구선수', '배구선수', '골프선수']);
 const civicTypes = new Set(['정치인', '공직자', '공무원', '정치인·공직자', '국회의원', '광역단체장', '기초단체장', '장관', '차관', '위원장']);
 
-function classify(row: unknown): string {
+export function classifyProfileBlog(row: unknown): string {
   if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('Missing profile classification');
   const data = row as Record<string, unknown>;
   const values = ['majorType', 'detailType', 'promptType'].map(key => typeof data[key] === 'string' ? data[key].trim() : '');
@@ -32,7 +32,7 @@ export async function resolveProfileBlog(folders: string[], requested: string): 
       if (file === 'connector-source.json' && !row && Array.isArray(data?.sourceRow)) {
         row = { majorType: data.sourceRow[1], detailType: data.sourceRow[2], promptType: data.sourceRow[15] };
       }
-      destinations.add(classify(row)); found = true;
+      destinations.add(classifyProfileBlog(row)); found = true;
     }
     if (!found) unclassified = true;
   }

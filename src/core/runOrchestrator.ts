@@ -54,7 +54,12 @@ export async function runPosts(
       if (options.signal?.aborted) {
         result = { outcome: "stopped", message: STOPPED_MESSAGE };
       } else {
-        result = await saveDraftSafely(engine, job, options);
+        const timings: string[] = [];
+        result = await saveDraftSafely(engine, job, {...options, onLog: message => {
+          if (message.startsWith("[timing]")) timings.push(message);
+          options.onLog?.(message);
+        }});
+        for (const timing of timings) await appendPostLog(job.folderPath, timing);
         if (options.signal?.aborted) {
           result = { outcome: "stopped", message: STOPPED_MESSAGE };
         }

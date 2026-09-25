@@ -82,6 +82,12 @@ export class TistoryBlogAutomation implements AutomationEngine {
   }
 
   async saveDraft(job: PostJob, options: AutomationRunOptions): Promise<AutomationResult> {
+    let stageStarted = performance.now();
+    const recordStage = (stage: string) => {
+      const now = performance.now();
+      options.onLog?.(`[timing] ${stage}: ${Math.round(now - stageStarted)} ms`);
+      stageStarted = now;
+    };
     if (!this.sessionVerified) {
       return {
         outcome: "failed",
@@ -100,16 +106,25 @@ export class TistoryBlogAutomation implements AutomationEngine {
         await this.setEditorMode(page, "기본모드");
       }
       await this.firstEditorBody(page, 10_000);
+      recordStage("editor_ready");
       const speed = getTypingSpeedProfile(options.speed);
       for (const event of job.parsed.events) {
         if (options.signal?.aborted) throw new Error("Run stopped by user");
         await this.executeEvent(page, event, speed);
         options.onLog?.(`Entered ${event.type}`);
       }
+      recordStage("input");
       await this.applyMetadata(page, job);
-      if (job.injectCoupangWidgets) await this.injectCoupangWidgets(page);
-      return await this.finalizePost(page, job);
+      recordStage("metadata");
+      if (job.injectCoupangWidgets) {
+        await this.injectCoupangWidgets(page);
+        recordStage("coupang_widgets");
+      }
+      const result = await this.finalizePost(page, job);
+      recordStage("save_confirmation");
+      return result;
     } catch (error) {
+      recordStage("interrupted_stage");
       return {
         outcome: "failed",
         retryable: false,
