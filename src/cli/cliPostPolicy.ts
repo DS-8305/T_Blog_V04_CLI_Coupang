@@ -11,6 +11,7 @@ export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
 
   return Promise.all(jobs.map(async (job) => {
     const content = await fs.readFile(job.contentPath, "utf8");
+    const athleteTags = await readConnectedAthleteTags(job.folderPath);
     const errors = [
       ...job.parsed.errors,
       ...findForbiddenMarkerErrors(content)
@@ -35,13 +36,40 @@ export async function applyCliDraftPolicy(jobs: PostJob[]): Promise<PostJob[]> {
         metadata: {
           publication: "draft" as const,
           category: null,
-          tags: [],
+          tags: athleteTags,
           scheduledAt: null
         },
         errors
       }
     };
   }));
+}
+
+async function readConnectedAthleteTags(postFolder: string): Promise<string[]> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(path.join(postFolder, "connector-source.json"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+
+  const source = JSON.parse(raw) as {
+    personId?: unknown;
+    row?: { personId?: unknown; majorType?: unknown; name?: unknown };
+    sourceRow?: unknown[];
+  };
+  const row = source.row ?? (Array.isArray(source.sourceRow) ? {
+    personId: source.sourceRow[0], majorType: source.sourceRow[1], name: source.sourceRow[3]
+  } : undefined);
+  if (row?.majorType !== "운동선수") return [];
+
+  const name = typeof row.name === "string" ? row.name.trim() : "";
+  const personId = typeof row.personId === "string" ? row.personId.trim() : "";
+  if (!name || !personId || (source.personId !== undefined && personId !== source.personId)) {
+    throw new Error("Connected athlete tags require a matching connector-source.json athlete name and personId.");
+  }
+  return [`${name}프로필`, `${name}성적`, `${name}연봉`, `${name}나이`];
 }
 
 async function resolveDisclosureImagePath(): Promise<string> {

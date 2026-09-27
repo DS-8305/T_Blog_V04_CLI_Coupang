@@ -55,7 +55,7 @@ it.each(['auto', 'moneyguru.tistory.com'])('CLI enforces routing before browser 
   const workspace = await folder();
   const post = path.join(workspace, 'posts', '001'); await fs.mkdir(post, { recursive: true });
   await fs.writeFile(path.join(post, 'content.txt'), '[TITLE]주권 프로필[/TITLE]\n본문');
-  await fs.writeFile(path.join(post, 'connector-source.json'), JSON.stringify({ row: { majorType: '운동선수', promptType: '야구선수' } }));
+  await fs.writeFile(path.join(post, 'connector-source.json'), JSON.stringify({ personId: 'SP1', row: { personId: 'SP1', majorType: '운동선수', promptType: '야구선수', name: '주권' } }));
   // A later civic post must not affect a one-post run's athlete destination.
   const later = path.join(workspace, 'posts', '002'); await fs.mkdir(later);
   await fs.writeFile(path.join(later, 'content.txt'), '[TITLE]정치인 프로필[/TITLE]\n본문');

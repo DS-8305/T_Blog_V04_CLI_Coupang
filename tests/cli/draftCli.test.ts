@@ -8,7 +8,7 @@ import type { LinkedSheetSource } from "../../src/sheets/sheetSource";
 describe("Tistory draft CLI", () => {
   it('syncs a profile immediately before saving its draft', async () => {
     const job = createJob('pending');
-    const linked = {...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'야구선수'}};
+    const linked = {...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'정치인·공직자'}};
     const order:string[]=[];
     const client=createSheetsClient();
     let completed=false;
@@ -25,7 +25,7 @@ describe("Tistory draft CLI", () => {
     expect(code).toBe(0);expect(order).toEqual(['profile','draft']);
   });
   it('does not report success if a profile becomes HOLD during saving and done is still blank',async()=>{
-    const job=createJob('pending');const source={...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'야구선수'}};
+    const job=createJob('pending');const source={...linkedSource(),postFolder:job.folderPath,source:{...linkedSource().source,version:2 as const,personId:'SP1',promptType:'정치인·공직자'}};
     const client=createSheetsClient();let held=false;let calls=0;const errors:string[]=[];
     client.readSourceRow=async()=>({keyword:'keyword',result:'',keywordColumn:18,resultColumn:19,automationStatus:held?'HOLD':'READY',profile:{personId:'SP1'} as never});
     const engine=createAutomation({ok:true});engine.saveDraft=async()=>{held=true;return {outcome:'confirmed',status:'draft_saved'};};

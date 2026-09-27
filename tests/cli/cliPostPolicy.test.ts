@@ -42,6 +42,32 @@ describe("applyCliDraftPolicy", () => {
     expect(result.injectCoupangWidgets).toBe(true);
   });
 
+  it("uses only four name-based tags for a connected athlete profile", async () => {
+    const job = await createJob("[TITLE]야구선수 임기영 프로필[/TITLE]\n[HR]\n[H2]기본 프로필[/H2]\n내용\n[HR]\n[H2]성적[/H2]\n내용", "pending", {
+      publication: "draft", category: null, tags: ["기존 태그", "기타 태그"], scheduledAt: null
+    });
+    await fs.writeFile(path.join(job.folderPath, "connector-source.json"), JSON.stringify({
+      personId: "SP000040", keyword: "야구선수 임기영 프로필 작성 진행해줘.",
+      row: { personId: "SP000040", majorType: "운동선수", promptType: "야구선수", name: "임기영" }
+    }));
+
+    const [result] = await applyCliDraftPolicy([job]);
+
+    expect(result.parsed.metadata.tags).toEqual(["임기영프로필", "임기영성적", "임기영연봉", "임기영나이"]);
+    expect(job.parsed.metadata.tags).toEqual(["기존 태그", "기타 태그"]);
+  });
+
+  it("reads athlete name and ID from a legacy connected row snapshot", async () => {
+    const job = await createJob("[TITLE]야구선수 임기영 프로필[/TITLE]\n본문");
+    await fs.writeFile(path.join(job.folderPath, "connector-source.json"), JSON.stringify({
+      sourceRow: ["SP000040", "운동선수", "야구선수", "임기영"]
+    }));
+
+    const [result] = await applyCliDraftPolicy([job]);
+
+    expect(result.parsed.metadata.tags).toEqual(["임기영프로필", "임기영성적", "임기영연봉", "임기영나이"]);
+  });
+
   it("rejects every desktop-only marker once per marker name", async () => {
     const job = await createJob([
       "[TITLE]A[/TITLE]",
