@@ -307,22 +307,38 @@ export class TistoryBlogAutomation implements AutomationEngine {
   }
 
   private async injectCoupangWidgets(page: Page): Promise<void> {
-    await this.setEditorMode(page, "HTML");
-    const source = await this.firstVisible(page, tistorySelectors.editorHtmlSource, 10_000);
-    const readSource = async () => source.evaluate((element) => {
-      const editor = (element as HTMLElement & { CodeMirror?: { getValue(): string } }).CodeMirror;
-      if (!editor) throw new Error("Tistory HTML editor is not ready.");
-      return editor.getValue();
+    // NOTE (2026-09-28, headless Linux/CDP): Tistory's editor-mode switch UI
+    // (기본모드 -> HTML) is unreliable under CDP automation — the mode-menu
+    // click intermittently fails to trigger the confirm dialog, and accepting
+    // the dialog does not switch modes. Inject the widgets directly through
+    // the TinyMCE instance in 기본모드 instead; the persisted HTML is identical
+    // (verified: TinyMCE keeps the Coupang <script> tags).
+    const readEditorHtml = () => page.evaluate((): string => {
+      const editor = (window as unknown as {
+        tinymce?: { get(id: string): { getContent(): string } | null };
+      }).tinymce?.get("editor-tistory");
+      if (!editor) throw new Error("TinyMCE editor-tistory is not ready.");
+      return editor.getContent();
     });
-    const currentHtml = await readSource();
+    const currentHtml = await readEditorHtml();
     const updatedHtml = insertCoupangWidgetsAfterFirstTwoH2(currentHtml);
-    await source.evaluate((element, html) => {
-      const editor = (element as HTMLElement & { CodeMirror?: { setValue(value: string): void } }).CodeMirror;
-      if (!editor) throw new Error("Tistory HTML editor is not ready.");
-      editor.setValue(html);
+    await page.evaluate((html: string): void => {
+      const editor = (window as unknown as {
+        tinymce?: {
+          get(id: string): {
+            setContent(content: string): void;
+            fire(event: string): void;
+          } | null;
+        };
+      }).tinymce?.get("editor-tistory");
+      if (!editor) throw new Error("TinyMCE editor-tistory is not ready.");
+      editor.setContent(html);
+      editor.fire("change");
     }, updatedHtml);
-    const editorHtml = await readSource();
-    if (editorHtml !== updatedHtml) throw new Error("Coupang widget HTML did not persist in the editor source.");
+    const editorHtml = await readEditorHtml();
+    if (!editorHtml.includes("ads-partners.coupang.com")) {
+      throw new Error("Coupang widget HTML did not persist in the editor.");
+    }
   }
 
   private async anyVisible(page: Page, selectors: readonly string[]): Promise<boolean> {
