@@ -78,8 +78,8 @@ function validateGenerationContract(content: string): ValidationError[] {
     .replace(/\[(?:BOLD|HR|IMAGE)(?::[^\]]+)?\]/g, "")
     .replace(/\[\/BOLD\]/g, "")
     .trim();
-  if (body.length >= 1800 && body.length <= 2000) return [];
-  return [{ code: "invalid_body_length", message: `Body must be 1,800-2,000 characters excluding title, markers, and sources; received ${body.length}.` }];
+  if (body.length >= 1200 && body.length <= 1500) return [];
+  return [{ code: "invalid_body_length", message: `Body must be 1,200-1,500 characters excluding title, markers, and sources; received ${body.length}.` }];
 }
 
 async function resolvePostsRoot(workspacePath: string): Promise<string> {
