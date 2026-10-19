@@ -4,7 +4,7 @@ import path from "node:path";
 import { TISTORY_HOME_URL } from "../automation/tistorySelectors";
 
 export { TISTORY_HOME_URL } from "../automation/tistorySelectors";
-export const MANUAL_CHROME_CDP_ENDPOINT = "http://127.0.0.1:9222";
+export const MANUAL_CHROME_CDP_ENDPOINT = "http://127.0.0.1:9224";
 
 export interface ChromeChildProcess {
   on(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
@@ -70,8 +70,7 @@ export class ManualChromeLoginLauncher {
         executable,
         [
           `--user-data-dir=${profilePath}`,
-          "--remote-debugging-address=127.0.0.1",
-          "--remote-debugging-port=9222",
+          "--remote-debugging-port=9224",
           "--no-first-run",
           "--no-default-browser-check",
           TISTORY_HOME_URL

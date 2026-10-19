@@ -38,7 +38,7 @@ describe("LoginSessionCoordinator", () => {
     launcher = {
       open: vi.fn().mockResolvedValue(undefined),
       isRunning: vi.fn().mockReturnValue(true),
-      getCdpEndpoint: vi.fn().mockReturnValue("http://127.0.0.1:9222")
+      getCdpEndpoint: vi.fn().mockReturnValue("http://127.0.0.1:9224")
     };
     automation = createAutomation();
     createAutomationFactory = vi.fn(() => automation);
@@ -58,7 +58,7 @@ describe("LoginSessionCoordinator", () => {
     const result = await coordinator.verifySession();
 
     expect(result).toMatchObject({ ok: true, snapshot: { state: "ready" } });
-    expect(createAutomationFactory).toHaveBeenCalledWith("http://127.0.0.1:9222");
+    expect(createAutomationFactory).toHaveBeenCalledWith("http://127.0.0.1:9224");
     expect(automation.verifySession).toHaveBeenCalledOnce();
   });
 
@@ -222,7 +222,7 @@ describe("LoginSessionCoordinator", () => {
     const verification = await coordinator.verifySession();
 
     expect(verification).toMatchObject({ ok: true, snapshot: { state: "ready" } });
-    expect(createAutomationFactory).toHaveBeenCalledWith("http://127.0.0.1:9222");
+    expect(createAutomationFactory).toHaveBeenCalledWith("http://127.0.0.1:9224");
     expect(automation.verifySession).toHaveBeenCalledOnce();
   });
 

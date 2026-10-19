@@ -172,9 +172,9 @@ describe("registerIpcHandlers", () => {
     await register();
     const dependencies = mocks.LoginSessionCoordinator.mock.calls[0][0];
 
-    expect(dependencies.createAutomation("http://127.0.0.1:9222")).toBe(mocks.automation);
+    expect(dependencies.createAutomation("http://127.0.0.1:9224")).toBe(mocks.automation);
     expect(mocks.attachTistoryAutomation).toHaveBeenCalledWith(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
   });
@@ -183,7 +183,7 @@ describe("registerIpcHandlers", () => {
     await register();
     const dependencies = mocks.LoginSessionCoordinator.mock.calls[0][0];
 
-    expect(() => dependencies.createAutomation("http://127.0.0.1:9222")).toThrow(/blog URL/i);
+    expect(() => dependencies.createAutomation("http://127.0.0.1:9224")).toThrow(/blog URL/i);
     expect(mocks.attachTistoryAutomation).not.toHaveBeenCalled();
   });
 

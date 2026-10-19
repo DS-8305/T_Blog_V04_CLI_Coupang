@@ -44,8 +44,7 @@ export async function launchCliChrome(
   const spawn = dependencies.spawn ?? nodeSpawn as unknown as Spawn;
   const child = spawn(executable, [
     `--user-data-dir=${path.resolve(profilePath)}`,
-    "--remote-debugging-address=127.0.0.1",
-    "--remote-debugging-port=9222",
+    "--remote-debugging-port=9224",
     "--no-first-run",
     "--no-default-browser-check",
     TISTORY_HOME_URL

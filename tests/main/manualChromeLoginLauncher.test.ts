@@ -62,8 +62,7 @@ describe("ManualChromeLoginLauncher", () => {
       "C:\\Users\\tester\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe",
       [
         "--user-data-dir=C:\\profile",
-        "--remote-debugging-address=127.0.0.1",
-        "--remote-debugging-port=9222",
+        "--remote-debugging-port=9224",
         "--no-first-run",
         "--no-default-browser-check",
         TISTORY_HOME_URL
@@ -81,13 +80,12 @@ describe("ManualChromeLoginLauncher", () => {
     expect(spawn).toHaveBeenCalledWith(
       expect.any(String),
       expect.arrayContaining([
-        "--remote-debugging-address=127.0.0.1",
-        "--remote-debugging-port=9222"
+        "--remote-debugging-port=9224"
       ]),
       expect.any(Object)
     );
-    expect(MANUAL_CHROME_CDP_ENDPOINT).toBe("http://127.0.0.1:9222");
-    expect(launcher.getCdpEndpoint()).toBe("http://127.0.0.1:9222");
+    expect(MANUAL_CHROME_CDP_ENDPOINT).toBe("http://127.0.0.1:9224");
+    expect(launcher.getCdpEndpoint()).toBe("http://127.0.0.1:9224");
   });
 
   it("falls back to Program Files Chrome when the per-user executable is inaccessible", async () => {

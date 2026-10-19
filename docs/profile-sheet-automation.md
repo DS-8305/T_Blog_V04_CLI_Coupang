@@ -67,6 +67,8 @@ pnpm.cmd run cli:build
 pnpm.cmd run sheet:build
 # 매 원고 준비: 입력 JSON은 저장소 밖 작업 폴더에 UTF-8로 저장
 node dist-cli/profilePrepareCli.js --workspace 'C:\Blog\ProfileWorkspace' --input 'C:\Blog\ProfileWorkspace\prepare-input.json'
+# (선택) 원고에 [IMAGE:images/...] 마커가 있는 경우 구글 이미지 검색 및 매핑
+node dist-cli/imageCollectCli.js --post 'C:\Blog\ProfileWorkspace\posts\선택된-폴더명'
 # 매 한 건 임시저장
 node dist-cli/draftCli.js run --workspace 'C:\Blog\ProfileWorkspace' --blog-url auto --speed fast --max-posts 1
 ```

@@ -4,6 +4,7 @@ import { parseContent } from '../core/parser';
 import { formatProfileSources, parseProfileResult, profileBodyText, type ProfileResult } from '../sheets/profileResult';
 import { buildSheetPostId } from '../sheets/sheetSource';
 import { classifyProfileBlog } from './profileBlogRouting';
+import { assertWithinPostFolder, remapCollectedImagesToContentMarkers } from './imageCollect';
 
 export type PrepareInput = {
   content: string;
@@ -39,7 +40,12 @@ export async function prepareProfile(workspace: string, input: PrepareInput) {
   const parsed = parseContent(content, folder);
   if (parsed.errors.length) throw new Error(parsed.errors.map(e => e.message).join('; '));
   for (const marker of content.matchAll(/\[([^\]\r\n]+)\]/g)) {
-    if (!/^(?:\/?(?:TITLE|H2|BOLD)|HR)$/.test(marker[1])) throw new Error(`Unsupported profile marker: ${marker[0]}`);
+    if (!/^(?:\/?(?:TITLE|H2|BOLD)|HR|IMAGE:[^\]]+)$/.test(marker[1])) throw new Error(`Unsupported profile marker: ${marker[0]}`);
+  }
+  const resolvedFolder = path.resolve(folder);
+  const imageEvents = parsed.events.filter((event): event is Extract<typeof event, { type: 'insertImage' }> => event.type === 'insertImage');
+  for (const imageEvent of imageEvents) {
+    assertWithinPostFolder(resolvedFolder, path.resolve(imageEvent.absolutePath), imageEvent.relativePath);
   }
   const headings = [...content.matchAll(/\[H2\]/g)];
   if (headings.length < 2) throw new Error('At least two H2 headings are required for Coupang widgets.');
@@ -60,9 +66,20 @@ export async function prepareProfile(workspace: string, input: PrepareInput) {
       throw new Error(`Profile already exists: ${entry.name}. Inspect its status before continuing.`);
     }
   }
-  // Exclusive creation prevents reruns from overwriting saved, running, or uncertain drafts.
-  try { await fs.mkdir(folder); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error(`Profile already exists: ${folder}`); throw error; }
+  // Exclusive creation prevents reruns from overwriting saved, running, or uncertain drafts,
+  // while permitting folders that only hold pre-collected images from image:collect.
+  let hasPrecollectedImages = false;
+  try {
+    await fs.mkdir(folder);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    const existingEntries = await fs.readdir(folder);
+    const allowedPreExisting = new Set(['images', 'image-collection.json']);
+    if (existingEntries.length === 0 || existingEntries.some(name => !allowedPreExisting.has(name))) {
+      throw new Error(`Profile already exists: ${folder}`);
+    }
+    hasPrecollectedImages = existingEntries.includes('image-collection.json');
+  }
   const connectorSource = {...source, version:1, referenceDate:input.latestInfoDate};
   await fs.writeFile(path.join(folder,'connector-source.json'), JSON.stringify(connectorSource,null,2)+'\n','utf8');
   const values = [result.latestInfoDate,result.title,result.body,result.tags.join(', '),formatProfileSources(result.sources)];
@@ -79,6 +96,10 @@ export async function prepareProfile(workspace: string, input: PrepareInput) {
   await fs.writeFile(path.join(folder,'content.txt'),content,'utf8');
   await fs.writeFile(path.join(folder,'profile-result.json'),JSON.stringify(result,null,2)+'\n','utf8');
   await fs.writeFile(path.join(folder,'connector-payload.json'),JSON.stringify(payload,null,2)+'\n','utf8');
+  if (hasPrecollectedImages && imageEvents.length > 0) {
+    await remapCollectedImagesToContentMarkers(folder, content);
+  }
   return {folder,personId:source.personId,rowNumber:source.rowNumber,bodyLength:result.body.length,h2Count:headings.length,
+    imageCount:imageEvents.length,
     warnings:result.body.length < 1000 || result.body.length > 1200 ? ['Review body length against the current sheet prompt.'] : []};
 }

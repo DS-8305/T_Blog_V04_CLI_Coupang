@@ -5,3 +5,8 @@ dist-renderer/
 dist-cli/
 release/
 *.log
+.venv/
+__pycache__/
+*.pyc
+downloaded_images/
+.browser-cache/

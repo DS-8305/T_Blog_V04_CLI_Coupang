@@ -30,7 +30,7 @@ CLI는 portable 앱과 같은 Chrome 프로필을 사용합니다.
 %APPDATA%\tistory-blog-auto-v01\browser-profile
 ```
 
-portable 앱과 CLI가 같은 프로필을 동시에 새로 열지 않도록 합니다. 이미 전용 Chrome이 `127.0.0.1:9222`에서 실행 중이면 `draft:login`은 두 번째 Chrome을 열지 않고 기존 창을 사용합니다.
+portable 앱과 CLI가 같은 프로필을 동시에 새로 열지 않도록 합니다. 이미 전용 Chrome이 `127.0.0.1:9224`에서 실행 중이면 `draft:login`은 두 번째 Chrome을 열지 않고 기존 창을 사용합니다.
 
 ## 작업 폴더 구조
 
@@ -94,9 +94,33 @@ pnpm.cmd run sheet:next -- --workspace C:\blog-workspace --sheet-url "https://do
 C:\blog-workspace\posts\000034-키워드-슬러그\sheet-source.json
 ```
 
-출력된 키워드와 글 폴더 절대 경로를 `prompts/tistory-blog-content-template.md`와 함께 Codex에 제공합니다. Codex가 같은 폴더에 `content.txt`와 `images/`를 생성해야 합니다. CLI는 본문이나 이미지를 자체 생성하지 않습니다.
+출력된 키워드와 글 폴더 절대 경로를 `prompts/tistory-blog-content-template.md`와 함께 Codex에 제공합니다. Codex가 같은 폴더에 `content.txt`와 `images/`를 준비합니다.
 
 이전 Sheet 연계 글이 아직 임시저장되지 않았거나 `done` 동기화가 끝나지 않았으면 새 행을 가져오지 않고 기존 폴더를 다시 안내합니다.
+
+## 이미지 검색 및 글 폴더 자동 매핑 (`image:collect`)
+
+저장소에 포함된 Python `image_collector` 패키지를 호출해 글 폴더(`posts/<id>/images/`)로 이미지를 검색·저장하고 `content.txt`의 `[IMAGE:images/...]` 마커와 자동으로 매핑할 수 있습니다. 기본 검색 엔진은 `google`(고해상도 원본 중심 수집)입니다.
+
+최초 1회 Python 의존성을 설치합니다.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+`content.txt`에 `[IMAGE:images/01-overview.png]` 등의 마커가 이미 있으면 해당 마커 개수와 파일명에 맞춰 이미지를 저장합니다. `profile-task.json`, `connector-source.json`, `sheet-source.json`이 있는 글 폴더에서는 `--keyword`를 생략하면 작업 키워드를 자동 사용합니다.
+
+```powershell
+# 구글 고해상도 이미지 검색 후 글 폴더의 [IMAGE:...] 마커 경로로 저장 (기본값: --engine google)
+pnpm.cmd run image:collect -- --post C:\blog-workspace\posts\001-first-post --keyword "검색 키워드"
+
+# 원고 작성 전에 먼저 N장 수집 (images/01-image.png, images/02-image.png ...)
+pnpm.cmd run image:collect -- --post C:\blog-workspace\posts\001-first-post --keyword "검색 키워드" --limit 2
+
+# 네이버 또는 통합 검색 / 원본 실패 시 썸네일 대체 허용 옵션
+pnpm.cmd run image:collect -- --post C:\blog-workspace\posts\001-first-post --keyword "검색 키워드" --engine google --download-mode original-preferred
+```
 
 ## 1단계: 전용 Chrome 열기
 

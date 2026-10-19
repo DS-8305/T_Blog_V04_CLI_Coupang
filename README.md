@@ -1,10 +1,10 @@
 # Tistory Blog Automation
 
-인물 프로필 CLI 배포 저장소: **[DS-8305/T_Blog_V02_CLI](https://github.com/DS-8305/T_Blog_V02_CLI)** (`main`). 기존 V01의 이력과 CLI를 기반으로 합니다. 현재 사용하는 연결형 Sheets·Drive 운영 절차는 [프로필 작업 안내](docs/profile-sheet-automation.md#현재-운영-연결형-sheetsdrive--기존-cli)를 먼저 확인하세요.
+배포 저장소: **[DS-8305/T_Blog_V04_CLI_Coupang](https://github.com/DS-8305/T_Blog_V04_CLI_Coupang)** (`main`). 기존 V03의 이력과 CLI를 기반으로 이미지 수집(`image_collector`) 및 포트 9224 지원을 추가했습니다. 현재 사용하는 연결형 Sheets·Drive 운영 절차는 [프로필 작업 안내](docs/profile-sheet-automation.md#현재-운영-연결형-sheetsdrive--기존-cli)를 먼저 확인하세요.
 
 인물 프로필은 `draft:run --blog-url auto`로 실행합니다. **운동선수는 time-giver, 정치인·공직자는 moneyguru**로 선택되며, 분류 충돌이나 명시한 주소 불일치는 저장 전에 차단됩니다. 자세한 명령과 메타데이터 형식은 위 운영 안내를 따릅니다.
 
-Windows에서 로컬 `content.txt`를 읽어 한 개의 티스토리 블로그에 임시저장, 즉시 공개 또는 예약 공개하는 Electron 앱입니다. Kakao 로그인은 전용 Chrome에서 사용자가 직접 수행하며 앱은 인증 정보를 저장하지 않습니다.
+Windows에서 로컬 `content.txt`를 읽어 한 개의 티스토리 블로그에 임시저장, 즉시 공개 또는 예약 공개하는 Electron 앱 및 CLI입니다. 전용 Chrome은 포트 9224에서 사용자가 직접 Kakao/Tistory 로그인을 1회 수행하며 앱은 인증 정보를 저장하지 않습니다.
 
 ## 실행
 
@@ -15,6 +15,13 @@ pnpm run electron:dev
 ```
 
 CLI의 `draft:verify`와 `draft:run`은 작업 후 Chrome 연결을 해제하고 종료 코드를 반환합니다. 사용자가 로그인한 전용 Chrome 창과 탭은 유지됩니다. 처리할 글이 없으면 `draft:run --blog-url auto`도 브라우저 연결 없이 종료하며, 서비스 계정으로 연결된 시트의 완료 기록 복구를 먼저 수행합니다.
+
+## 이미지 검색 및 글 폴더 자동 매핑 (`image:collect`)
+
+```powershell
+# 네이버 또는 구글 이미지 검색 후 글 폴더(images/) 및 [IMAGE:...] 마커로 자동 매핑
+pnpm run image:collect -- --post C:\blog-workspace\posts\001-first-post --keyword "검색 키워드" --engine naver
+```
 
 Chrome이 설치된 환경에서는 실제 브라우저 회귀 테스트도 실행할 수 있습니다.
 
@@ -40,7 +47,9 @@ $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\secure\tistory-sheet-service-account.j
 
 ```powershell
 pnpm.cmd run sheet:next -- --workspace C:\blog-workspace --sheet-url "https://docs.google.com/spreadsheets/d/105xA7xNE-0FcvR06Tw4RruWuVgSCoZ-MaJ4Jw-QlE-g/edit"
-# Codex가 출력된 글 폴더에 content.txt와 images/를 생성
+# 이미지 검색 및 수집
+pnpm.cmd run image:collect -- --post C:\blog-workspace\posts\000034-키워드 --keyword "키워드"
+# 임시저장 실행
 pnpm.cmd run draft:run -- --workspace C:\blog-workspace --blog-url https://sample.tistory.com --max-posts 1
 ```
 

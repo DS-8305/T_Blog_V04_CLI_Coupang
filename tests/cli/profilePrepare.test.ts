@@ -49,3 +49,22 @@ it('never overwrites an existing or completed item, including a moved sheet row'
   await expect(prepareProfile(root,value)).rejects.toThrow(/already exists/);
   expect(await fs.readFile(path.join(prepared.folder,'content.txt'),'utf8')).toBe(value.content);
 });
+it('allows [IMAGE:...] markers inside the post folder and remaps pre-collected images',async()=>{
+  const root=await workspace(); const value=input();
+  const folder=path.join(root,'posts','000019-한승택-프로필');
+  await fs.mkdir(path.join(folder,'images'),{recursive:true});
+  await fs.writeFile(path.join(folder,'images','01-image.png'),'collected-png-1');
+  await fs.writeFile(path.join(folder,'image-collection.json'),JSON.stringify({
+    version:1,keyword:'한승택',engine:'google',collectedAt:'2026-10-19T06:00:00.000Z',
+    images:[{index:1,relativePath:'images/01-image.png',marker:'[IMAGE:images/01-image.png]',engine:'google',width:1200,height:800,byteSize:15,contentHash:'h1',sourceUrl:'',downloadedUrl:'',licenseUrl:'',title:'',downloadKind:'original'}]
+  }));
+  value.content='[TITLE]한승택 프로필[/TITLE]\n\n소개입니다.\n[HR]\n[H2]프로필[/H2]\n[IMAGE:images/01-profile.png]\n내용입니다.\n[HR]\n[H2]성적[/H2]\n기록입니다.';
+  const prepared=await prepareProfile(root,value);
+  expect(prepared.imageCount).toBe(1);
+  expect(await fs.readFile(path.join(prepared.folder,'images','01-profile.png'),'utf8')).toBe('collected-png-1');
+});
+it('rejects profile [IMAGE:...] markers that escape the post folder',async()=>{
+  const root=await workspace(); const value=input();
+  value.content='[TITLE]한승택 프로필[/TITLE]\n\n소개입니다.\n[HR]\n[H2]프로필[/H2]\n[IMAGE:../outside.png]\n내용입니다.\n[HR]\n[H2]성적[/H2]\n기록입니다.';
+  await expect(prepareProfile(root,value)).rejects.toThrow(/must stay inside the post folder/);
+});

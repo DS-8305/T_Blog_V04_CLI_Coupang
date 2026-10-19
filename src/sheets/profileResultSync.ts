@@ -43,11 +43,21 @@ export async function syncProfileResult(folder: string, client: GoogleSheetsClie
     const parsed = parseContent(content,folder);
     const [job] = await applyCliDraftPolicy([{id:path.basename(folder),folderPath:folder,contentPath,parsed,status:'pending'}]);
     if (job!.parsed.errors.length) throw new Error(job!.parsed.errors.map(e => e.message).join('; '));
+    for (const event of parsed.events) {
+      if (event.type !== 'insertImage') continue;
+      try {
+        const stat = await fs.stat(event.absolutePath);
+        if (!stat.isFile()) throw new Error(`Image path is not a file: ${event.relativePath}`);
+      } catch {
+        throw new Error(`Image file does not exist: ${event.relativePath}`);
+      }
+    }
     if (parsed.title !== result.title.trim() || profileBodyText(content) !== result.body.replace(/\r\n/g,'\n').trim()) {
       throw new Error('profile-result.json does not match content.txt title/body.');
     }
+    const draftEventsJson = options.draftJob ? JSON.stringify(options.draftJob.parsed.events) : '';
     if (options.draftJob && (parsed.title !== options.draftJob.parsed.title
-      || JSON.stringify(parsed.events) !== JSON.stringify(options.draftJob.parsed.events))) {
+      || (draftEventsJson !== JSON.stringify(parsed.events) && draftEventsJson !== JSON.stringify(job!.parsed.events)))) {
       throw new Error('Current manuscript does not match the loaded draft; reload before saving.');
     }
     const digest = manuscriptDigest(source,content,result);

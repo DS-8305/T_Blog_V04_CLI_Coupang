@@ -23,12 +23,12 @@ describe("TistoryBlogAutomation session verification", () => {
     const harness = createHarness({ visibleSelectors: [tistorySelectors.editorReady[0]] });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
     const automation = TistoryBlogAutomation.attach(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
 
     await expect(automation.verifySession()).resolves.toEqual({ ok: true });
-    expect(playwrightMocks.connectOverCDP).toHaveBeenCalledWith("http://127.0.0.1:9222");
+    expect(playwrightMocks.connectOverCDP).toHaveBeenCalledWith("http://127.0.0.1:9224");
     expect(harness.page.goto).toHaveBeenCalledWith(
       "https://sample.tistory.com/manage/newpost",
       { waitUntil: "domcontentloaded" }
@@ -46,7 +46,7 @@ describe("TistoryBlogAutomation session verification", () => {
     });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
     const automation = TistoryBlogAutomation.attach(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
     vi.spyOn(automation, "finalizePost").mockResolvedValue({
@@ -78,7 +78,7 @@ describe("TistoryBlogAutomation session verification", () => {
     });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
     const automation = TistoryBlogAutomation.attach(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
     vi.spyOn(automation, "applyMetadata").mockImplementation(async () => { actions.push("metadata"); });
@@ -114,7 +114,7 @@ describe("TistoryBlogAutomation session verification", () => {
     const harness = createHarness({ visibleSelectors: [tistorySelectors.editorReady[0]] });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
     const automation = TistoryBlogAutomation.attach(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
 
@@ -138,7 +138,7 @@ describe("TistoryBlogAutomation session verification", () => {
     });
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
     const automation = TistoryBlogAutomation.attach(
-      "http://127.0.0.1:9222",
+      "http://127.0.0.1:9224",
       "https://sample.tistory.com"
     );
     vi.spyOn(automation, "finalizePost").mockResolvedValue({
@@ -169,7 +169,7 @@ describe("TistoryBlogAutomation session verification", () => {
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
 
     const result = await TistoryBlogAutomation
-      .attach("http://127.0.0.1:9222", "https://sample.tistory.com")
+      .attach("http://127.0.0.1:9224", "https://sample.tistory.com")
       .verifySession();
 
     expect(result).toMatchObject({ ok: false, reason: "missing" });
@@ -183,7 +183,7 @@ describe("TistoryBlogAutomation session verification", () => {
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
 
     const result = await TistoryBlogAutomation
-      .attach("http://127.0.0.1:9222", "https://sample.tistory.com")
+      .attach("http://127.0.0.1:9224", "https://sample.tistory.com")
       .verifySession();
 
     expect(result).toMatchObject({ ok: false, reason: "security" });
@@ -194,7 +194,7 @@ describe("TistoryBlogAutomation session verification", () => {
     playwrightMocks.connectOverCDP.mockResolvedValue(harness.browser);
 
     const result = await TistoryBlogAutomation
-      .attach("http://127.0.0.1:9222", "https://sample.tistory.com")
+      .attach("http://127.0.0.1:9224", "https://sample.tistory.com")
       .verifySession();
 
     expect(result).toMatchObject({ ok: false, reason: "profile_error" });
@@ -216,7 +216,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("finds the body inside Tistory's editor iframe", async () => {
     const actions: string[] = [];
     const page = createIframeEditorPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, { type: "typeText", text: "iframe 본문" }, speed);
 
@@ -231,7 +231,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("enters an H2 block through Tistory's moving 제목1 format control", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, { type: "typeHeading1", text: "첫 소제목" }, speed);
 
@@ -250,7 +250,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("selects Tistory divider style1 after opening the divider menu", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, { type: "insertDivider" }, speed);
 
@@ -262,7 +262,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("opens 첨부 then 사진 and assigns the image through the file chooser once", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, {
       type: "insertImage",
@@ -286,7 +286,7 @@ describe("TistoryBlogAutomation editor events", () => {
       delayedSelector: tistorySelectors.photoMenuItem[0],
       visibleAfterCountChecks: 3
     });
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, {
       type: "insertImage",
@@ -301,7 +301,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("retries the attachment button when its menu does not open", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions, { photoVisibleAfterAttachClicks: 2 });
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, {
       type: "insertImage",
@@ -315,7 +315,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("uses a visible TinyMCE attachment control when a hidden duplicate comes first", async () => {
     const actions: string[] = [];
     const page = createDuplicateAttachPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, {
       type: "insertImage",
@@ -330,7 +330,7 @@ describe("TistoryBlogAutomation editor events", () => {
   it("moves the caret after an image before entering the following body text", async () => {
     const actions: string[] = [];
     const page = createEditorPage(actions);
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
 
     await automation.executeEvent(page as never, {
       type: "insertImage",
@@ -399,7 +399,7 @@ describe("TistoryBlogAutomation finalization", () => {
 
   it("confirms a draft when Tistory increments the saved-draft count", async () => {
     const page = createDraftFinalizationPage();
-    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9222", "https://sample.tistory.com");
+    const automation = TistoryBlogAutomation.attach("http://127.0.0.1:9224", "https://sample.tistory.com");
     const job = {
       parsed: { metadata: { publication: "draft", scheduledAt: null } }
     };
